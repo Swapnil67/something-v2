@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <png.h>
 #include <SDL.h>
 
 #define SCREEN_WIDTH 800
@@ -36,12 +37,28 @@ constexpr int LEVEL_HEIGHT = 5;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
+    {Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
 };
 
-void render_level(SDL_Renderer *renderer)
+struct Tile_Texture {
+  SDL_Rect rect;
+  SDL_Texture *texture;
+};
+
+void render_tile_texture(SDL_Renderer *renderer,
+                         Tile_Texture texture,
+                         int x, int y)
+{
+  SDL_Rect dstrect = {x, y, TILE_SIZE, TILE_SIZE};
+  sdl(SDL_RenderCopy(renderer,
+                     texture.texture,
+                     &texture.rect, // * srcrect 
+                     &dstrect));
+}
+
+void render_level(SDL_Renderer *renderer, Tile_Texture wall_texture)
 {
   for (int y = 0; y < LEVEL_HEIGHT; ++y) {
     for (int x = 0; x < LEVEL_WIDTH; ++x) {
@@ -50,15 +67,22 @@ void render_level(SDL_Renderer *renderer)
       case Tile::Empty:
         /* code */
         break;
-      case Tile::Wall: {
-        sdl(SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255));
-        SDL_Rect rect = {
-            x * TILE_SIZE,
-            y * TILE_SIZE,
-            TILE_SIZE, TILE_SIZE};
-        sdl(SDL_RenderFillRect(renderer, &rect));
-      } break;
-      
+      case Tile::Wall:
+      {
+        // sdl(SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255));
+        // SDL_Rect rect = {
+        //     x * TILE_SIZE,
+        //     y * TILE_SIZE,
+        //     TILE_SIZE, TILE_SIZE};
+        // sdl(SDL_RenderFillRect(renderer, &rect));
+
+        render_tile_texture(renderer,
+                            wall_texture,
+                            x * TILE_SIZE,
+                            y * TILE_SIZE);
+      }
+      break;
+
       default:
         break;
       }
@@ -88,6 +112,57 @@ int main(void) {
       -1,
       SDL_RENDERER_PRESENTVSYNC));
 
+  // * Read Image using libpng
+  const char *TILESET_FILEPATH = "assets/sprites/fantasy_tiles.png";
+  png_image tilesset; /* The control structure used by libpng */
+  /* Initialize the 'png_image' structure. */
+  memset(&tilesset, 0, (sizeof tilesset));
+  tilesset.version = PNG_IMAGE_VERSION;
+  if(!png_image_begin_read_from_file(&tilesset, TILESET_FILEPATH)) {
+    fprintf(stderr, "ERROR: libpng: could not read file: `%s`: %s\n", TILESET_FILEPATH, tilesset.message);
+    abort();
+  }
+  // uint32_t *tilesset_buffer = (uint32_t *)std::malloc(sizeof(uint32_t) * tilesset.width * tilesset.height);
+
+  tilesset.format = PNG_FORMAT_RGBA;
+  /* 
+  * Now allocate enough memory to hold the image in this format; the
+  * PNG_IMAGE_SIZE macro uses the information about the image (width,
+  * height and format) stored in 'image'.
+  */
+  png_bytep tileset_pixels;
+  tileset_pixels = (png_bytep)malloc(PNG_IMAGE_SIZE(tilesset));
+
+  if (!png_image_finish_read(
+          &tilesset,
+          nullptr /*background*/,
+          tileset_pixels,
+          0 /*row_stride*/,
+          nullptr /*colormap*/))
+  {
+    fprintf(stderr, "ERROR: libpng: could not finish reading file: `%s`: %s\n", TILESET_FILEPATH, tilesset.message);
+    abort(); 
+  }
+
+  // * This is a texture from png image
+  SDL_Surface *tileset_surface =
+      sdl(SDL_CreateRGBSurfaceFrom(tileset_pixels,
+                                    tilesset.width,
+                                    tilesset.height,
+                                    32,
+                                    tilesset.width * 4,
+                                    0x000000FF,
+                                    0x0000FF00,
+                                    0x00FF0000,
+                                    0xFF000000));
+
+  SDL_Texture *tileset_texture =
+      sdl(SDL_CreateTextureFromSurface(renderer, tileset_surface));
+
+  Tile_Texture wall_texture = {
+      .rect = {120, 128, 16, 16},
+      .texture = tileset_texture};
+
   bool quit = false;
   while (!quit) {
     SDL_Event event;
@@ -109,29 +184,13 @@ int main(void) {
 
     sdl(SDL_RenderClear(renderer));
 
-    // int window_width, window_height;
-    // SDL_GetWindowSize(window, &window_width,
-    //                   &window_height);
+   
+    // sdl(SDL_RenderCopy(renderer,
+    //                 tileset_texture,
+    //                 &tileset_surface->clip_rect,
+    //                 &tileset_surface->clip_rect));
 
-    // int rows = window_height / TILE_SIZE;
-    // int columns = window_width / TILE_SIZE;
-    // SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    // for(int row = 0; row < rows; ++row) {
-    //   sdl(SDL_RenderDrawLine(renderer,
-    //                          0,
-    //                          (row + 1) * TILE_SIZE,
-    //                          window_width,
-    //                          (row + 1) * TILE_SIZE));
-    // }
-    // for(int col = 0; col < columns; ++col) {
-    //   sdl(SDL_RenderDrawLine(renderer,
-    //                          (col + 1) * TILE_SIZE,
-    //                          0,
-    //                          (col + 1) * TILE_SIZE,
-    //                          window_height));
-    // }
-
-    render_level(renderer);
+    render_level(renderer, wall_texture);
 
     SDL_RenderPresent(renderer);
   }
