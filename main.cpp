@@ -12,6 +12,7 @@
 
 constexpr int TILE_SIZE = 64;
 constexpr int PLAYER_SIZE = 48;
+constexpr int PLAYER_SPEED = 2;
 
 int sec(int code) {
   if(code < 0) {
@@ -57,13 +58,16 @@ struct Sprite {
 };
 
 void render_sprite(SDL_Renderer *renderer,
-                         Sprite texture,
-                         SDL_Rect dstrect)
+                   Sprite texture,
+                   SDL_Rect dstrect,
+                   SDL_RendererFlip flip = SDL_FLIP_NONE)
 {
-  sec(SDL_RenderCopy(renderer,
-                     texture.texture,
-                     &texture.rect, // * srcrect 
-                     &dstrect));
+  sec(SDL_RenderCopyEx(renderer,
+                       texture.texture,
+                       &texture.rect, // * srcrect
+                       &dstrect,
+                       0.0, nullptr,
+                       flip));
 }
 
 void render_level(SDL_Renderer *renderer, Sprite wall_texture)
@@ -159,11 +163,12 @@ struct Animat {
 static inline
 void render_animat(SDL_Renderer *renderer,
                    Animat animat,
-                   SDL_Rect dstrect)
+                   SDL_Rect dstrect,
+                   SDL_RendererFlip flip = SDL_FLIP_NONE)
 {
   render_sprite(renderer,
                 animat.frames[animat.frame_current % animat.frames_count],
-                dstrect);
+                dstrect, flip);
 }
 
 // * Checks the animation cooldown period before rendering new animation
@@ -235,6 +240,8 @@ int main(void) {
   int x = 0;
 
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
+  SDL_RendererFlip player_dir = SDL_FLIP_NONE;
+
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
     SDL_Event event;
@@ -250,15 +257,18 @@ int main(void) {
 
     // * Update state
     if(keyboard[SDL_SCANCODE_D]) {
-      x += 1;
+      x += PLAYER_SPEED;
       current = &walking;
+      player_dir = SDL_FLIP_NONE;
     }
     else if (keyboard[SDL_SCANCODE_A]) {
-      x -= 1;
+      x -= PLAYER_SPEED;
       current = &walking;
+      player_dir = SDL_FLIP_HORIZONTAL;
     }
     else {
       current = &idle;
+      player_dir = SDL_FLIP_NONE;
     }
 
     // * Render state
@@ -272,7 +282,7 @@ int main(void) {
         x,
         4 * TILE_SIZE - PLAYER_SIZE,
         PLAYER_SIZE, PLAYER_SIZE};
-    render_animat(renderer, *current, dstrect);
+    render_animat(renderer, *current, dstrect, player_dir);
     SDL_RenderPresent(renderer);
 
     const Uint64 dt = SDL_GetTicks64() - begin;
