@@ -51,13 +51,13 @@ Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
 };
 
-struct Tile_Texture {
+struct Sprite {
   SDL_Rect rect;
   SDL_Texture *texture;
 };
 
-void render_tile_texture(SDL_Renderer *renderer,
-                         Tile_Texture texture,
+void render_sprite(SDL_Renderer *renderer,
+                         Sprite texture,
                          SDL_Rect dstrect)
 {
   sec(SDL_RenderCopy(renderer,
@@ -66,7 +66,7 @@ void render_tile_texture(SDL_Renderer *renderer,
                      &dstrect));
 }
 
-void render_level(SDL_Renderer *renderer, Tile_Texture wall_texture)
+void render_level(SDL_Renderer *renderer, Sprite wall_texture)
 {
   for (int y = 0; y < LEVEL_HEIGHT; ++y) {
     for (int x = 0; x < LEVEL_WIDTH; ++x) {
@@ -81,7 +81,7 @@ void render_level(SDL_Renderer *renderer, Tile_Texture wall_texture)
             x * TILE_SIZE,
             y * TILE_SIZE,
             TILE_SIZE, TILE_SIZE};
-        render_tile_texture(renderer,
+            render_sprite(renderer,
                             wall_texture,
                             dstrect);
       }
@@ -148,6 +148,35 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
   return image_texture;
 }
 
+struct Animat {
+  Sprite *frames;
+  size_t frames_count;
+  size_t frame_current;
+  uint64_t frame_duration;
+  uint64_t frame_cooldown;
+};
+
+static inline
+void render_animat(SDL_Renderer *renderer,
+                   Animat animat,
+                   SDL_Rect dstrect)
+{
+  render_sprite(renderer,
+                animat.frames[animat.frame_current % animat.frames_count],
+                dstrect);
+}
+
+// * Checks the animation cooldown period before rendering new animation
+void update_animat(Animat *animat, Uint64 dt) {
+  if (dt < animat->frame_cooldown) {
+    animat->frame_cooldown -= dt;
+  }
+  else {
+    animat->frame_current = (animat->frame_current + 1) % animat->frames_count;
+    animat->frame_cooldown = animat->frame_duration;
+  }
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -160,20 +189,20 @@ int main(void) {
   SDL_Renderer *renderer = sec(SDL_CreateRenderer(
       window,
       -1,
-      SDL_RENDERER_PRESENTVSYNC));
+      SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED));
 
+  // * Tile Texture
   SDL_Texture *tileset_texture =
       load_texture_from_png(renderer, TILES_FILEPATH);
-  Tile_Texture tile_texture = {
+  Sprite tile_texture = {
     .rect = {120, 128, 16, 16},
     .texture = tileset_texture};
 
+  // * Player Texture
   SDL_Texture *walking_texture =
       load_texture_from_png(renderer, WALKING_FILEPATH);
   constexpr int walking_frame_count = 4;
-  constexpr Uint64 walking_frame_duration = 100;
-  int walking_frame_current = 0;
-  Tile_Texture walking_frames[walking_frame_count];
+  Sprite walking_frames[walking_frame_count];
   for (int i = 0; i < walking_frame_count; ++i) {
     walking_frames[i].rect = {
         .x = i * PLAYER_SIZE,
@@ -183,7 +212,25 @@ int main(void) {
     walking_frames[i].texture = walking_texture;
   }
 
-  Uint64 walking_frame_cooldown = walking_frame_duration;
+  // * Player Animation
+  Animat walking = {
+      .frames = walking_frames,
+      .frames_count = 4,
+      .frame_current = 0,
+      .frame_duration = 100,
+      .frame_cooldown = 100};
+
+  // * Player Idle Animation
+  Animat idle = {
+      .frames = walking_frames + 2, // * 3rd frame
+      .frames_count = 1,
+      .frame_current = 0,
+      .frame_duration = 100,
+      .frame_cooldown = 0};
+
+  // * Current player animation
+  Animat *current = &idle;
+
   bool quit = false;
   int x = 0;
 
@@ -201,16 +248,20 @@ int main(void) {
       }
     }
 
+    // * Update state
     if(keyboard[SDL_SCANCODE_D]) {
       x += 1;
+      current = &walking;
     }
     else if (keyboard[SDL_SCANCODE_A]) {
       x -= 1;
+      current = &walking;
+    }
+    else {
+      current = &idle;
     }
 
-    // * Update state
     // * Render state
-
     sec(SDL_SetRenderDrawColor(renderer,
                                0x00, 0x00, 0x00, 0xff));
 
@@ -221,18 +272,11 @@ int main(void) {
         x,
         4 * TILE_SIZE - PLAYER_SIZE,
         PLAYER_SIZE, PLAYER_SIZE};
-    render_tile_texture(renderer, walking_frames[walking_frame_current], dstrect);
+    render_animat(renderer, *current, dstrect);
     SDL_RenderPresent(renderer);
 
     const Uint64 dt = SDL_GetTicks64() - begin;
-    if(dt < walking_frame_cooldown) {
-      walking_frame_cooldown -= dt;
-    }
-    else {
-      walking_frame_current = (walking_frame_current + 1) % walking_frame_count;
-      walking_frame_cooldown = walking_frame_duration;
-    }
-
+    update_animat(&walking, dt);
   }
 
   SDL_Quit();
