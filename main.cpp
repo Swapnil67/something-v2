@@ -13,7 +13,7 @@
 constexpr int TILE_SIZE = 64;
 constexpr int PLAYER_SIZE = 48;
 
-int sdl(int code) {
+int sec(int code) {
   if(code < 0) {
     fprintf(stderr, "SDL pooped itself: %s\n", SDL_GetError()); 
     abort();
@@ -22,7 +22,7 @@ int sdl(int code) {
 }
 
 template <typename T>
-T *sdl(T *ptr) {
+T *sec(T *ptr) {
   if(ptr == nullptr) {
     fprintf(stderr, "SDL pooped itself: %s\n", SDL_GetError());  
     abort();
@@ -60,7 +60,7 @@ void render_tile_texture(SDL_Renderer *renderer,
                          Tile_Texture texture,
                          SDL_Rect dstrect)
 {
-  sdl(SDL_RenderCopy(renderer,
+  sec(SDL_RenderCopy(renderer,
                      texture.texture,
                      &texture.rect, // * srcrect 
                      &dstrect));
@@ -129,7 +129,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
 
   // * This is a sdl surface from png image
   SDL_Surface *image_surface =
-      sdl(SDL_CreateRGBSurfaceFrom(image_pixels,
+      sec(SDL_CreateRGBSurfaceFrom(image_pixels,
                                     image.width,
                                     image.height,
                                     32,
@@ -141,7 +141,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
 
   // * This is a sdl texture from sdl surface
   SDL_Texture *image_texture =
-      sdl(SDL_CreateTextureFromSurface(renderer, image_surface));
+      sec(SDL_CreateTextureFromSurface(renderer, image_surface));
 
   free(image_pixels);
   SDL_FreeSurface(image_surface);
@@ -149,15 +149,15 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
 }
 
 int main(void) {
-  sdl(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS));
+  sec(SDL_Init(SDL_INIT_VIDEO));
 
-  SDL_Window *window = sdl(SDL_CreateWindow(
+  SDL_Window *window = sec(SDL_CreateWindow(
       "Game",
       0, 0,
       SCREEN_WIDTH, SCREEN_HEIGHT,
       SDL_WINDOW_RESIZABLE));
 
-  SDL_Renderer *renderer = sdl(SDL_CreateRenderer(
+  SDL_Renderer *renderer = sec(SDL_CreateRenderer(
       window,
       -1,
       SDL_RENDERER_PRESENTVSYNC));
@@ -211,10 +211,10 @@ int main(void) {
     // * Update state
     // * Render state
 
-    sdl(SDL_SetRenderDrawColor(renderer,
+    sec(SDL_SetRenderDrawColor(renderer,
                                0x00, 0x00, 0x00, 0xff));
 
-    sdl(SDL_RenderClear(renderer));
+    sec(SDL_RenderClear(renderer));
    
     render_level(renderer, tile_texture);
     SDL_Rect dstrect = {
