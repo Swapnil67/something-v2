@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```console
-$ make
+$ make -B
 $ something
 ```
 
