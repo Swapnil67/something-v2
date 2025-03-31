@@ -11,6 +11,9 @@
 #define TILES_FILEPATH "assets/sprites/fantasy_tiles.png"
 #define WALKING_FILEPATH "assets/sprites/walking-12px.png"
 
+#define COLOR_BLACK 0x00, 0x00, 0x00, 0xff
+#define COLOR_RED 0xff, 0x00, 0x00, 0xff
+
 constexpr int TILE_SIZE = 64;
 constexpr int PLAYER_SIZE = 48;
 constexpr int PLAYER_SPEED = 2;
@@ -267,16 +270,17 @@ int main(void) {
   // * Current player animation
   Animat *current = &idle;
 
-  SDL_Rect player_hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE};
+  // * Define Player
   Player player = {
       .dy = 0,
-      .hitbox = player_hitbox};
-
-  const Uint8* keyboard = SDL_GetKeyboardState(NULL);
+      .hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
+      
   SDL_RendererFlip player_dir = SDL_FLIP_NONE;
-
+      
   int ddy = 1;
-  bool quit = false;
+  bool quit = false, debug = false;
+  const Uint8* keyboard = SDL_GetKeyboardState(NULL);
+
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
     SDL_Event event;
@@ -289,6 +293,9 @@ int main(void) {
           switch (event.key.keysym.sym) {
           case SDLK_SPACE: {
             player.dy = -20;
+          } break;
+          case SDLK_q: {
+            debug = !debug;
           } break;
 
           default:
@@ -321,13 +328,17 @@ int main(void) {
     }
 
     // * Render state
-    sec(SDL_SetRenderDrawColor(renderer,
-                               0x00, 0x00, 0x00, 0xff));
-
+    sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
-   
     render_level(renderer, tile_texture);
     render_animat(renderer, *current, player.hitbox, player_dir);
+
+    // * Show player hitbox
+    if(debug) {
+      sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
+      SDL_RenderDrawRect(renderer, &player.hitbox);
+    }
+
     SDL_RenderPresent(renderer);
 
     const Uint64 dt = SDL_GetTicks64() - begin;
