@@ -340,9 +340,7 @@ int main(void) {
     }
 
     SDL_RenderPresent(renderer);
-
-    const Uint64 dt = SDL_GetTicks64() - begin;
-    update_animat(&walking, dt);
+    update_animat(&walking, SDL_GetTicks64() - begin);
   }
 
   SDL_Quit();
