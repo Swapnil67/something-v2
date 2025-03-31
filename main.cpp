@@ -191,24 +191,26 @@ struct Player {
   SDL_Rect hitbox;
 };
 
+static inline
+bool is_not_oob(int x, int y) {
+  return 0 <= x && x < LEVEL_WIDTH &&
+         0 <= y && y < LEVEL_HEIGHT;
+}
+
 void resolve_player_collision(Player *player) {
   assert(player);
 
   // * bottom left hitbox point
-  int x0 = std::clamp(player->hitbox.x / TILE_SIZE,
-                      0, LEVEL_WIDTH - 1);
-
+  int x0 = player->hitbox.x / TILE_SIZE;
+  
   // * bottom right hitbox point
-  int x1 = std::clamp((player->hitbox.x + TILE_SIZE) / TILE_SIZE,
-                      0, LEVEL_WIDTH - 1);
-
-  int y = std::clamp((player->hitbox.y + TILE_SIZE) / TILE_SIZE,
-                      0, LEVEL_HEIGHT - 1);
-  assert(x0 <= x1);
+  int x1 = (player->hitbox.x + TILE_SIZE) / TILE_SIZE;
+  
+  int y = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;
 
   // printf("x0 = %d, x1 = %d, y = %d\n", x0, x1,  y);
   for (int x = x0; x <= x1; ++x) {
-    if (level[y][x] == Tile::Wall) {
+    if (is_not_oob(x, y) && level[y][x] == Tile::Wall) {
       player->dy = 0;
       // * Put player on top of the wall
       player->hitbox.y = y * TILE_SIZE - player->hitbox.h;
@@ -296,6 +298,11 @@ int main(void) {
           } break;
           case SDLK_q: {
             debug = !debug;
+          } break;
+          case SDLK_r: {
+            player.dy = 0;
+            player.hitbox.x = 0;
+            player.hitbox.y = 0;
           } break;
 
           default:
