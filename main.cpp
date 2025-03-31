@@ -50,9 +50,9 @@ constexpr int LEVEL_WIDTH = 5;
 constexpr int LEVEL_HEIGHT = 5;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
+    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
+    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall},
 };
 
@@ -206,14 +206,24 @@ void resolve_player_collision(Player *player) {
   // * bottom right hitbox point
   int x1 = (player->hitbox.x + TILE_SIZE) / TILE_SIZE;
   
-  int y = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;
+  // * top left hitbox point
+  int y0 = player->hitbox.y / TILE_SIZE;
+
+  // * top right hitbox point
+  int y1 = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;
 
   // printf("x0 = %d, x1 = %d, y = %d\n", x0, x1,  y);
   for (int x = x0; x <= x1; ++x) {
-    if (is_not_oob(x, y) && level[y][x] == Tile::Wall) {
+    if (is_not_oob(x, y0) && level[y0][x] == Tile::Wall) {
+      player->dy = 0;
+      // * Snap the player back to bottom
+      player->hitbox.y = (y0 + 1) * TILE_SIZE; // * Co-ordinates of tile just below the wall
+    }
+
+    if (is_not_oob(x, y1) && level[y1][x] == Tile::Wall) {
       player->dy = 0;
       // * Put player on top of the wall
-      player->hitbox.y = y * TILE_SIZE - player->hitbox.h;
+      player->hitbox.y = y1 * TILE_SIZE - player->hitbox.h;
       return;
     }
   }
