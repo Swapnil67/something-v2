@@ -52,7 +52,7 @@ Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
+    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
     {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall},
 };
 
@@ -138,14 +138,14 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
   // * This is a sdl surface from png image
   SDL_Surface *image_surface =
       sec(SDL_CreateRGBSurfaceFrom(image_pixels,
-                                    image.width,
-                                    image.height,
-                                    32,
-                                    image.width * 4,
-                                    0x000000FF,
-                                    0x0000FF00,
-                                    0x00FF0000,
-                                    0xFF000000));
+                                   (int)image.width,
+                                   (int)image.height,
+                                   32,
+                                   (int)image.width * 4,
+                                   0x000000FF,
+                                   0x0000FF00,
+                                   0x00FF0000,
+                                   0xFF000000));
 
   // * This is a sdl texture from sdl surface
   SDL_Texture *image_texture =
@@ -197,33 +197,105 @@ bool is_not_oob(int x, int y) {
          0 <= y && y < LEVEL_HEIGHT;
 }
 
+void resolve_point_collision(int *x, int *y) {
+  assert(x);
+  assert(y);
+
+  const int tile_x = *x / TILE_SIZE;
+  const int tile_y = *y / TILE_SIZE;
+  // printf("tile_x: %d, tile_y: %d\n", tile_x, tile_y);
+
+  const int x0 = tile_x * TILE_SIZE;
+  const int x1 = (tile_x + 1) * TILE_SIZE;
+  const int y0 = tile_y * TILE_SIZE;
+  const int y1 = (tile_y + 1) * TILE_SIZE;
+
+  // printf("x0: %d, x1: %d\n", x0, x1);
+  // printf("y0: %d, y1: %d\n", y0, y1);
+
+  constexpr auto SIDES_COUNT = 4;
+  constexpr auto FIELDS_COUNT = 4;
+
+  // * Field Indexes
+  constexpr auto DISTANCE = 0;
+  constexpr auto X = 1;
+  constexpr auto Y = 2;
+
+  const int dxy[SIDES_COUNT][FIELDS_COUNT] = {
+      {std::abs(*x - x0), x0, *y},
+      {std::abs(x1 - *x), x1, *y},
+      {std::abs(*y - y0), *x, y0},
+      {std::abs(y1 - *y), *x, y1},
+  };
+
+  // printf("*x - x0: %d, \t| *x: %d, x0: %d\n", std::abs(*x - x0), *x, x0);
+  // printf("x1 - *x: %d, \t| x1: %d, *x: %d\n", std::abs(x1 - *x), x1, *x);
+  // printf("*y - y0: %d, \t| *y: %d, y0: %d\n", std::abs(*y - y0), *y, y0);
+  // printf("y1 - *y: %d, \t| y1: %d, *y: %d\n", std::abs(y1 - *y), y1, *y);
+  // printf("-----------------\n");
+  // printf("y0: %d, y1: %d\n", y0, y1);
+
+  // * If player encounters wall from any direction
+  if(is_not_oob(tile_x, tile_y) && level[tile_y][tile_x] == Tile::Wall) {
+    int closest_side = -1;
+    // * Find to which side the distance is closest 
+    for (int side = 0; side < SIDES_COUNT; side++) {
+      if (closest_side < 0 || dxy[closest_side][DISTANCE] > dxy[side][DISTANCE]) {
+        closest_side = side;
+      }
+    }
+
+    *x = dxy[closest_side][X];
+    *y = dxy[closest_side][Y];
+  }
+}
+
 void resolve_player_collision(Player *player) {
   assert(player);
 
-  // * bottom left hitbox point
-  int x0 = player->hitbox.x / TILE_SIZE;
-  
-  // * bottom right hitbox point
-  int x1 = (player->hitbox.x + TILE_SIZE) / TILE_SIZE;
-  
-  // * top left hitbox point
-  int y0 = player->hitbox.y / TILE_SIZE;
+  // printf("h->x: %d, h->y: %d\n", player->hitbox.x, player->hitbox.y);
 
-  // * top right hitbox point
-  int y1 = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;
+  // * Four corners of player tilebox
+  int x0 = player->hitbox.x / TILE_SIZE;                  // * bottom left hitbox point
+  // int x1 = (player->hitbox.x / TILE_SIZE) + 1;    // * bottom right hitbox point
+  int x1 = (player->hitbox.x + TILE_SIZE) / TILE_SIZE;    // * bottom right hitbox point
 
-  // printf("x0 = %d, x1 = %d, y = %d\n", x0, x1,  y);
+  int y0 = player->hitbox.y / TILE_SIZE;                  // * top left hitbox point
+  // int y1 = (player->hitbox.y / TILE_SIZE) + 1; // * bottom right hitbox point
+  int y1 = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;    // * top right hitbox point
+
+  // printf("x0: %d, x1: %d\n", x0, x1);
+  // printf("y0: %d, y1: %d\n", y0, y1);
+
+  assert(x0 < x1);
+
   for (int x = x0; x <= x1; ++x) {
+    // * Top collision detection
     if (is_not_oob(x, y0) && level[y0][x] == Tile::Wall) {
       player->dy = 0;
       // * Snap the player back to bottom
       player->hitbox.y = (y0 + 1) * TILE_SIZE; // * Co-ordinates of tile just below the wall
+      return;
     }
 
+    // * Bottom collision detection
     if (is_not_oob(x, y1) && level[y1][x] == Tile::Wall) {
       player->dy = 0;
       // * Put player on top of the wall
       player->hitbox.y = y1 * TILE_SIZE - player->hitbox.h;
+      return;
+    }
+  }
+
+  assert(y0 < y1);
+  for (int y = y0; y <= y1; ++y) {
+    // if (is_not_oob(x0, y) && level[y][x0] == Tile::Wall) {
+    //   player->hitbox.x = (x0 + 1) * TILE_SIZE; 
+    //   return;
+    // }
+    if (is_not_oob(x1, y) && level[y][x1] == Tile::Wall) {
+      // printf("x1: %d\n", x1);
+      player->hitbox.x = (x1 * TILE_SIZE) - player->hitbox.w; 
       return;
     }
   }
@@ -293,8 +365,12 @@ int main(void) {
   bool quit = false, debug = false;
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
 
+  constexpr int CURSOR_SIZE = 10;
+  SDL_Rect cursor = {};
+
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
+
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
       switch (event.type) {
@@ -318,6 +394,14 @@ int main(void) {
           default:
             break;
           }
+        } break;
+        case SDL_MOUSEMOTION: {
+          auto x = event.motion.x;
+          auto y = event.motion.y;
+          resolve_point_collision(&x, &y);
+          cursor = {
+              x - CURSOR_SIZE, y - CURSOR_SIZE,
+              CURSOR_SIZE * 2, CURSOR_SIZE * 2};
         } break;
       }
     }
@@ -354,6 +438,7 @@ int main(void) {
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
       SDL_RenderDrawRect(renderer, &player.hitbox);
+      SDL_RenderFillRect(renderer, &cursor);
     }
 
     SDL_RenderPresent(renderer);
