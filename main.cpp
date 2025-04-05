@@ -235,27 +235,46 @@ void resolve_point_collision(int *x, int *y) {
     int dd;
   };
 
+  // Side sides[] = {
+  //     // * left
+  //     {std::abs(*x - x0) * std::abs(*x - x0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
+  //     // * right
+  //     {std::abs(x1 - *x) * std::abs(x1 - *x), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
+  //     // * top
+  //     {std::abs(*y - y0) * std::abs(*y - y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
+  //     // * bottom
+  //     {std::abs(y1 - *y) * std::abs(y1 - *y), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
+  //     // * Top Left
+  //     {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(*y - y0) * std::abs(*y - y0),
+  //      x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+  //     // * Top Right
+  //     {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(*y - y0) * std::abs(*y - y0),
+  //      x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+  //     // * Bottom Left
+  //     {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(y1 - *y) * std::abs(y1 - *y),
+  //      x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+  //     // * Bottom Right
+  //     {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(y1 - *y) * std::abs(y1 - *y),
+  //      x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+  // };
+
   Side sides[] = {
       // * left
-      {std::abs(*x - x0) * std::abs(*x - x0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
+      {get_sqr_dist(*x, 0, x0, 0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
       // * right
-      {std::abs(x1 - *x) * std::abs(x1 - *x), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
+      {get_sqr_dist(x1, 0, *x, 0), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
       // * top
-      {std::abs(*y - y0) * std::abs(*y - y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
+      {get_sqr_dist(0, *y, 0, y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
       // * bottom
-      {std::abs(y1 - *y) * std::abs(y1 - *y), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
+      {get_sqr_dist(0, *y, 0, y1), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
       // * Top Left
-      {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(*y - y0) * std::abs(*y - y0),
-       x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+      {get_sqr_dist(x0, y0, *x, *y), x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
       // * Top Right
-      {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(*y - y0) * std::abs(*y - y0),
-       x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+      {get_sqr_dist(x1, y0, *x, *y), x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
       // * Bottom Left
-      {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(y1 - *y) * std::abs(y1 - *y),
-       x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+      {get_sqr_dist(x0, y1, *x, *y), x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
       // * Bottom Right
-      {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(y1 - *y) * std::abs(y1 - *y),
-       x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+      {get_sqr_dist(x1, y1, *x, *y), x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
   };
   constexpr int SIDES_COUNT = sizeof(sides) / sizeof(sides[0]);
 
