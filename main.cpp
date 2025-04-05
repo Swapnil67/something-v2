@@ -50,10 +50,10 @@ constexpr int LEVEL_WIDTH = 5;
 constexpr int LEVEL_HEIGHT = 5;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall},
+    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall},
+    {Tile::Wall, Tile::Wall, Tile::Empty, Tile::Wall, Tile::Empty},
 };
 
 struct Sprite {
@@ -197,6 +197,16 @@ bool is_not_oob(int x, int y) {
          0 <= y && y < LEVEL_HEIGHT;
 }
 
+bool is_tile_empty(int x, int y) {
+  return !is_not_oob(x, y) || level[y][x] == Tile::Empty;
+}
+
+int get_sqr_dist(int x0, int y0, int x1, int y1) {
+  int dx = x0 - x1;
+  int dy = y0 - y1;
+  return dx * dx + dy * dy;
+}
+
 void resolve_point_collision(int *x, int *y) {
   assert(x);
   assert(y);
@@ -204,6 +214,11 @@ void resolve_point_collision(int *x, int *y) {
   const int tile_x = *x / TILE_SIZE;
   const int tile_y = *y / TILE_SIZE;
   // printf("tile_x: %d, tile_y: %d\n", tile_x, tile_y);
+
+  // * check if player out of bound or standing on empty tile
+  if(!is_not_oob(tile_x, tile_y) && level[tile_y][tile_x] == Tile::Empty) {
+    return;
+  }
 
   const int x0 = tile_x * TILE_SIZE;
   const int x1 = (tile_x + 1) * TILE_SIZE;
@@ -213,20 +228,36 @@ void resolve_point_collision(int *x, int *y) {
   // printf("x0: %d, x1: %d\n", x0, x1);
   // printf("y0: %d, y1: %d\n", y0, y1);
 
-  constexpr auto SIDES_COUNT = 4;
-  constexpr auto FIELDS_COUNT = 4;
-
-  // * Field Indexes
-  constexpr auto DISTANCE = 0;
-  constexpr auto X = 1;
-  constexpr auto Y = 2;
-
-  const int dxy[SIDES_COUNT][FIELDS_COUNT] = {
-      {std::abs(*x - x0), x0, *y},
-      {std::abs(x1 - *x), x1, *y},
-      {std::abs(*y - y0), *x, y0},
-      {std::abs(y1 - *y), *x, y1},
+  struct Side {
+    int sqr_distance;
+    int x; int y;
+    int dx; int dy;
+    int dd;
   };
+
+  Side sides[] = {
+      // * left
+      {std::abs(*x - x0) * std::abs(*x - x0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
+      // * right
+      {std::abs(x1 - *x) * std::abs(x1 - *x), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
+      // * top
+      {std::abs(*y - y0) * std::abs(*y - y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
+      // * bottom
+      {std::abs(y1 - *y) * std::abs(y1 - *y), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
+      // * Top Left
+      {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(*y - y0) * std::abs(*y - y0),
+       x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+      // * Top Right
+      {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(*y - y0) * std::abs(*y - y0),
+       x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
+      // * Bottom Left
+      {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(y1 - *y) * std::abs(y1 - *y),
+       x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+      // * Bottom Right
+      {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(y1 - *y) * std::abs(y1 - *y),
+       x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+  };
+  constexpr int SIDES_COUNT = sizeof(sides) / sizeof(sides[0]);
 
   // printf("*x - x0: %d, \t| *x: %d, x0: %d\n", std::abs(*x - x0), *x, x0);
   // printf("x1 - *x: %d, \t| x1: %d, *x: %d\n", std::abs(x1 - *x), x1, *x);
@@ -235,19 +266,27 @@ void resolve_point_collision(int *x, int *y) {
   // printf("-----------------\n");
   // printf("y0: %d, y1: %d\n", y0, y1);
 
-  // * If player encounters wall from any direction
-  if(is_not_oob(tile_x, tile_y) && level[tile_y][tile_x] == Tile::Wall) {
-    int closest_side = -1;
-    // * Find to which side the distance is closest 
-    for (int side = 0; side < SIDES_COUNT; side++) {
-      if (closest_side < 0 || dxy[closest_side][DISTANCE] > dxy[side][DISTANCE]) {
-        closest_side = side;
-      }
+  int closest_side = -1;
+  // * Find to which current_side the distance is closest
+  for (int current_side = 0; current_side < SIDES_COUNT; current_side++) {
+
+    // * Check for neighbouring tiles
+    // * If neighbouring tile is wall, increase the sqr_distance by TILE_SIZE
+    for (int i = 1;
+         !is_tile_empty(tile_x + sides[current_side].dx * i,
+                        tile_y + sides[current_side].dy * i);
+         ++i)
+    {
+      sides[current_side].sqr_distance += sides[current_side].dd;
     }
 
-    *x = dxy[closest_side][X];
-    *y = dxy[closest_side][Y];
+    if (closest_side < 0 || sides[closest_side].sqr_distance > sides[current_side].sqr_distance) {
+      closest_side = current_side;
+    }
   }
+
+  *x = sides[closest_side].x;
+  *y = sides[closest_side].y;
 }
 
 void resolve_player_collision(Player *player) {
@@ -267,32 +306,34 @@ void resolve_player_collision(Player *player) {
   // printf("x0: %d, x1: %d\n", x0, x1);
   // printf("y0: %d, y1: %d\n", y0, y1);
 
-  assert(x0 < x1);
+  assert(x0 <= x1);
 
   for (int x = x0; x <= x1; ++x) {
     // * Top collision detection
     if (is_not_oob(x, y0) && level[y0][x] == Tile::Wall) {
       player->dy = 0;
       // * Snap the player back to bottom
-      player->hitbox.y = (y0 + 1) * TILE_SIZE; // * Co-ordinates of tile just below the wall
-      return;
+      player->hitbox.y = ((y0 + 1) * TILE_SIZE); // * Co-ordinates of tile just below the wall
+      // return;
     }
 
     // * Bottom collision detection
     if (is_not_oob(x, y1) && level[y1][x] == Tile::Wall) {
       player->dy = 0;
       // * Put player on top of the wall
-      player->hitbox.y = y1 * TILE_SIZE - player->hitbox.h;
-      return;
+      player->hitbox.y = (y1 * TILE_SIZE) - player->hitbox.h;
+      // return;
     }
   }
 
-  assert(y0 < y1);
-  for (int y = y0; y <= y1; ++y) {
-    // if (is_not_oob(x0, y) && level[y][x0] == Tile::Wall) {
-    //   player->hitbox.x = (x0 + 1) * TILE_SIZE; 
-    //   return;
-    // }
+  assert(y0 <= y1);
+  for (int y = y0; y <= y1 - 1; ++y) {
+    // * right collision detection
+    if (is_not_oob(x0, y) && level[y][x0] == Tile::Wall) {
+      player->hitbox.x = (x0 + 1) * TILE_SIZE; 
+      return;
+    }
+    // * left collision detection
     if (is_not_oob(x1, y) && level[y][x1] == Tile::Wall) {
       // printf("x1: %d\n", x1);
       player->hitbox.x = (x1 * TILE_SIZE) - player->hitbox.w; 
@@ -366,7 +407,7 @@ int main(void) {
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
 
   constexpr int CURSOR_SIZE = 10;
-  SDL_Rect cursor = {};
+  SDL_Rect cursor = {}, tile_rect = {};
 
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
@@ -381,6 +422,9 @@ int main(void) {
           switch (event.key.keysym.sym) {
           case SDLK_SPACE: {
             player.dy = -20;
+          } break;
+          case SDLK_l: {
+            quit = true;
           } break;
           case SDLK_q: {
             debug = !debug;
@@ -398,6 +442,10 @@ int main(void) {
         case SDL_MOUSEMOTION: {
           auto x = event.motion.x;
           auto y = event.motion.y;
+          tile_rect = {
+              (event.motion.x / TILE_SIZE) * TILE_SIZE,
+              (event.motion.y / TILE_SIZE) * TILE_SIZE,
+              TILE_SIZE, TILE_SIZE};
           resolve_point_collision(&x, &y);
           cursor = {
               x - CURSOR_SIZE, y - CURSOR_SIZE,
@@ -437,8 +485,9 @@ int main(void) {
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
-      SDL_RenderDrawRect(renderer, &player.hitbox);
-      SDL_RenderFillRect(renderer, &cursor);
+      sec(SDL_RenderDrawRect(renderer, &player.hitbox));
+      sec(SDL_RenderFillRect(renderer, &cursor));
+      sec(SDL_RenderDrawRect(renderer, &tile_rect));
     }
 
     SDL_RenderPresent(renderer);
