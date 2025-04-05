@@ -52,8 +52,8 @@ Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall},
-    {Tile::Wall, Tile::Wall, Tile::Empty, Tile::Wall, Tile::Empty},
+    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall},
+    {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty},
 };
 
 struct Sprite {
@@ -187,6 +187,7 @@ void update_animat(Animat *animat, Uint64 dt) {
 }
 
 struct Player {
+  int dx;
   int dy;
   SDL_Rect hitbox;
 };
@@ -216,7 +217,7 @@ void resolve_point_collision(int *x, int *y) {
   // printf("tile_x: %d, tile_y: %d\n", tile_x, tile_y);
 
   // * check if player out of bound or standing on empty tile
-  if(!is_not_oob(tile_x, tile_y) && level[tile_y][tile_x] == Tile::Empty) {
+  if(!is_not_oob(tile_x, tile_y) || level[tile_y][tile_x] == Tile::Empty) {
     return;
   }
 
@@ -311,54 +312,52 @@ void resolve_point_collision(int *x, int *y) {
 void resolve_player_collision(Player *player) {
   assert(player);
 
-  // printf("h->x: %d, h->y: %d\n", player->hitbox.x, player->hitbox.y);
-
   // * Four corners of player tilebox
-  int x0 = player->hitbox.x / TILE_SIZE;                  // * bottom left hitbox point
-  // int x1 = (player->hitbox.x / TILE_SIZE) + 1;    // * bottom right hitbox point
-  int x1 = (player->hitbox.x + TILE_SIZE) / TILE_SIZE;    // * bottom right hitbox point
-
-  int y0 = player->hitbox.y / TILE_SIZE;                  // * top left hitbox point
-  // int y1 = (player->hitbox.y / TILE_SIZE) + 1; // * bottom right hitbox point
-  int y1 = (player->hitbox.y + TILE_SIZE) / TILE_SIZE;    // * top right hitbox point
+  int x0 = player->hitbox.x;                       // * bottom left hitbox point
+  int y0 = player->hitbox.y;                       // * top left hitbox point
+  int x1 = player->hitbox.x + player->hitbox.w;    // * bottom right hitbox point
+  int y1 = player->hitbox.y + player->hitbox.h;    // * top right hitbox point
 
   // printf("x0: %d, x1: %d\n", x0, x1);
   // printf("y0: %d, y1: %d\n", y0, y1);
 
-  assert(x0 <= x1);
+  int mesh[][2] = {
+    {x0, y0},
+    {x1, y0},
+    {x0, y1},
+    {x1, y1},
+  };
 
-  for (int x = x0; x <= x1; ++x) {
-    // * Top collision detection
-    if (is_not_oob(x, y0) && level[y0][x] == Tile::Wall) {
+  constexpr int X = 0;
+  constexpr int Y = 1;
+  constexpr int MESH_COUNT = sizeof(mesh) / sizeof(mesh[0]);
+  for (int i = 0; i < MESH_COUNT; ++i) {
+    int tx = mesh[i][X];
+    int ty = mesh[i][Y];
+    resolve_point_collision(&tx, &ty);
+    int dx = tx - mesh[i][X];
+    int dy = ty - mesh[i][Y];
+
+    // printf("dx: %d, dy: %d\n", dx, dy);
+    if(dy) {
       player->dy = 0;
-      // * Snap the player back to bottom
-      player->hitbox.y = ((y0 + 1) * TILE_SIZE); // * Co-ordinates of tile just below the wall
-      // return;
     }
-
-    // * Bottom collision detection
-    if (is_not_oob(x, y1) && level[y1][x] == Tile::Wall) {
-      player->dy = 0;
-      // * Put player on top of the wall
-      player->hitbox.y = (y1 * TILE_SIZE) - player->hitbox.h;
-      // return;
+    
+    if(dx) {
+      player->dx = 0;
+    }
+    
+    for(int j = 0;  j < MESH_COUNT; ++j) {
+      mesh[j][X] += dx;
+      mesh[j][Y] += dy;
     }
   }
 
-  assert(y0 <= y1);
-  for (int y = y0; y <= y1 - 1; ++y) {
-    // * right collision detection
-    if (is_not_oob(x0, y) && level[y][x0] == Tile::Wall) {
-      player->hitbox.x = (x0 + 1) * TILE_SIZE; 
-      return;
-    }
-    // * left collision detection
-    if (is_not_oob(x1, y) && level[y][x1] == Tile::Wall) {
-      // printf("x1: %d\n", x1);
-      player->hitbox.x = (x1 * TILE_SIZE) - player->hitbox.w; 
-      return;
-    }
-  }
+  static_assert(MESH_COUNT >= 1);
+
+  // * Take th first point in mesh and update player x & y
+  player->hitbox.x = mesh[0][X];
+  player->hitbox.y = mesh[0][Y];
 }
 
 int main(void) {
@@ -473,27 +472,29 @@ int main(void) {
       }
     }
 
-    player.dy += ddy;
-    player.hitbox.y += player.dy;
-
-    // * Resolve player collision
-    resolve_player_collision(&player);
-
     // * Update state
     if(keyboard[SDL_SCANCODE_D]) {
-      player.hitbox.x += PLAYER_SPEED;
+      player.dx = PLAYER_SPEED;
       current = &walking;
       player_dir = SDL_FLIP_NONE;
     }
     else if (keyboard[SDL_SCANCODE_A]) {
-      player.hitbox.x -= PLAYER_SPEED;
+      player.dx = -PLAYER_SPEED;
       current = &walking;
       player_dir = SDL_FLIP_HORIZONTAL;
     }
     else {
       current = &idle;
+      player.dx = 0;
       player_dir = SDL_FLIP_NONE;
     }
+
+    player.dy += ddy;
+    player.hitbox.x += player.dx;
+    player.hitbox.y += player.dy;
+
+    // * Resolve player collision
+    resolve_player_collision(&player);
 
     // * Render state
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
