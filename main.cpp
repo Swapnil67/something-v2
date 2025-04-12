@@ -81,7 +81,6 @@ void render_level(SDL_Renderer *renderer, Sprite wall_texture)
       switch (level[y][x])
       {
       case Tile::Empty:
-        /* code */
         break;
       case Tile::Wall:
       {
@@ -339,14 +338,14 @@ void resolve_player_collision(Player *player) {
     int dy = ty - mesh[i][Y];
 
     // printf("dx: %d, dy: %d\n", dx, dy);
-    if(dy) {
+    if (dy) {
       player->dy = 0;
     }
-    
-    if(dx) {
+
+    if (dx) {
       player->dx = 0;
     }
-    
+
     for(int j = 0;  j < MESH_COUNT; ++j) {
       mesh[j][X] += dx;
       mesh[j][Y] += dy;
@@ -489,6 +488,7 @@ int main(void) {
       player_dir = SDL_FLIP_NONE;
     }
 
+    // * Add gravity to player dy
     player.dy += ddy;
     player.hitbox.x += player.dx;
     player.hitbox.y += player.dy;
