@@ -4,6 +4,7 @@
 #include <png.h>
 #include <cassert>
 #include <SDL.h>
+#include <SDL_ttf.h>
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -18,12 +19,27 @@ constexpr int TILE_SIZE = 64;
 constexpr int PLAYER_SIZE = 48;
 constexpr int PLAYER_SPEED = 2;
 
-int sec(int code) {
+template <typename T>
+T *stec(T *ptr) {
+  if(ptr == nullptr) {
+    fprintf(stderr, "SDL_ttf pooped itself: %s\n", TTF_GetError()); 
+    abort();
+  }
+  return ptr;
+}
+
+void stec(int code) {
+  if(code < 0) {
+    fprintf(stderr, "SDL_ttf pooped itself: %s\n", TTF_GetError()); 
+    abort();
+  }
+}
+
+void sec(int code) {
   if(code < 0) {
     fprintf(stderr, "SDL pooped itself: %s\n", SDL_GetError()); 
     abort();
   }
-  return code;
 }
 
 template <typename T>
@@ -101,6 +117,7 @@ void render_level(SDL_Renderer *renderer, Sprite wall_texture)
   }
 }
 
+// * Creates a SDL_Texture from the png image
 SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
 {
   // * Read Image using libpng
@@ -127,7 +144,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
           &image,
           nullptr /*background*/,
           image_pixels,
-          0 /*row_stride*/,
+          0       /*row_stride*/,
           nullptr /*colormap*/))
   {
     fprintf(stderr, "ERROR: libpng: could not finish reading file: `%s`: %s\n", filepath, image.message);
@@ -362,15 +379,24 @@ void resolve_player_collision(Player *player) {
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
+  // * Initialize the SDL Window
   SDL_Window *window = sec(SDL_CreateWindow(
       "Game",
       0, 0,
       SCREEN_WIDTH, SCREEN_HEIGHT,
       SDL_WINDOW_RESIZABLE));
 
+  // * Initialize the SDL Renderer
   SDL_Renderer *renderer = sec(SDL_CreateRenderer(
       window, -1,
       SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED));
+
+  // load font.ttf at size 16 into font
+  stec(TTF_Init());
+  TTF_Font *font = stec(TTF_OpenFont("assets/Comic-Sans-MS.ttf", 64));
+  SDL_Surface *hello_world_surface = stec(TTF_RenderText_Blended(font, "Welcome to my dengeon!", {255, 0, 0, 255}));
+  SDL_Texture *hello_world_texture = sec(SDL_CreateTextureFromSurface(renderer, hello_world_surface));
+  SDL_FreeSurface(hello_world_surface);
 
   // * Tile Texture
   SDL_Texture *tileset_texture =
@@ -508,6 +534,19 @@ int main(void) {
       sec(SDL_RenderDrawRect(renderer, &player.hitbox));
       sec(SDL_RenderFillRect(renderer, &cursor));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
+    }
+
+    {
+      int w, h;
+      sec(SDL_QueryTexture(hello_world_texture,
+                              nullptr, nullptr,
+                              &w, &h));
+      SDL_Rect srcrect = {0, 0, w, h};
+      SDL_Rect dstrect = {0, 50, w, h};
+      sec(SDL_RenderCopy(renderer,
+                        hello_world_texture,
+                        &srcrect,
+                        &dstrect));
     }
 
     SDL_RenderPresent(renderer);
