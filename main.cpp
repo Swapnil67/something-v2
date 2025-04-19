@@ -376,6 +376,55 @@ void resolve_player_collision(Player *player) {
   player->hitbox.y = mesh[0][Y];
 }
 
+SDL_Texture *render_text_as_texture(TTF_Font *font,
+                                    SDL_Renderer *renderer,
+                                    const char *text,
+                                    SDL_Color color) {
+  SDL_Surface *text_surface = stec(TTF_RenderText_Blended(font, text, color));
+  SDL_Texture *text_texture = sec(SDL_CreateTextureFromSurface(renderer, text_surface));
+  SDL_FreeSurface(text_surface);
+  return text_texture;
+}
+
+void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, int x, int y) {
+  int w, h;
+  sec(SDL_QueryTexture(texture, nullptr, nullptr, &w, &h));
+  SDL_Rect srcrect = {0, 0, w, h};
+  SDL_Rect dstrect = {x, y, w, h};
+  sec(SDL_RenderCopy(renderer, texture, &srcrect, &dstrect));
+}
+
+constexpr size_t DIGITS_COUNT = 120;
+SDL_Texture *digits_textures[DIGITS_COUNT];
+
+void render_digits_of_number(SDL_Renderer *renderer,
+                   int64_t number,
+                   int x, int y) {
+
+  if(number == 0) {
+    // * render 0
+    static_assert(DIGITS_COUNT > 1);
+    render_texture(digits_textures[0], renderer, x, y);
+    return;
+  }
+
+  if(number < 0) {
+    // * render -
+  }
+
+  while(number != 0) {
+    int d = number % 10;
+    render_texture(digits_textures[d], renderer, x, y);
+
+    int w, h;
+    sec(SDL_QueryTexture(digits_textures[d], nullptr, nullptr, &w, &h));
+
+    x -= w;
+
+    number = number / 10;
+  }
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -394,9 +443,11 @@ int main(void) {
   // load font.ttf at size 16 into font
   stec(TTF_Init());
   TTF_Font *font = stec(TTF_OpenFont("assets/Comic-Sans-MS.ttf", 64));
-  SDL_Surface *hello_world_surface = stec(TTF_RenderText_Blended(font, "Welcome to my dengeon!", {255, 0, 0, 255}));
-  SDL_Texture *hello_world_texture = sec(SDL_CreateTextureFromSurface(renderer, hello_world_surface));
-  SDL_FreeSurface(hello_world_surface);
+  for(size_t i = 0 ; i < DIGITS_COUNT; ++i) {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%zu", i);
+    digits_textures[i] = render_text_as_texture(font, renderer, buffer, {255, 0, 0, 255});
+  }
 
   // * Tile Texture
   SDL_Texture *tileset_texture =
@@ -536,18 +587,7 @@ int main(void) {
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
     }
 
-    {
-      int w, h;
-      sec(SDL_QueryTexture(hello_world_texture,
-                              nullptr, nullptr,
-                              &w, &h));
-      SDL_Rect srcrect = {0, 0, w, h};
-      SDL_Rect dstrect = {0, 50, w, h};
-      sec(SDL_RenderCopy(renderer,
-                        hello_world_texture,
-                        &srcrect,
-                        &dstrect));
-    }
+    render_digits_of_number(renderer, 67, 100, 50);
 
     SDL_RenderPresent(renderer);
     update_animat(&walking, SDL_GetTicks64() - begin);
