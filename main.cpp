@@ -346,6 +346,7 @@ void resolve_player_collision(Player *player) {
 
   constexpr int X = 0;
   constexpr int Y = 1;
+  constexpr int IMPACT_THRESHOLD = 3;
   constexpr int MESH_COUNT = sizeof(mesh) / sizeof(mesh[0]);
   for (int i = 0; i < MESH_COUNT; ++i) {
     int tx = mesh[i][X];
@@ -355,11 +356,11 @@ void resolve_player_collision(Player *player) {
     int dy = ty - mesh[i][Y];
 
     // printf("dx: %d, dy: %d\n", dx, dy);
-    if (dy) {
+    if (std::abs(dy) >= IMPACT_THRESHOLD) {
       player->dy = 0;
     }
 
-    if (dx) {
+    if (std::abs(dx) >= IMPACT_THRESHOLD) {
       player->dx = 0;
     }
 
