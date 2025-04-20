@@ -377,6 +377,7 @@ void resolve_player_collision(Player *player) {
   player->hitbox.y = mesh[0][Y];
 }
 
+// * Creates a SDL_Texture from text
 SDL_Texture *render_text_as_texture(TTF_Font *font,
                                     SDL_Renderer *renderer,
                                     const char *text,
@@ -424,6 +425,27 @@ void render_digits_of_number(SDL_Renderer *renderer,
 
     number = number / 10;
   }
+}
+
+void displayf(SDL_Renderer *renderer,
+             TTF_Font *font,
+             SDL_Color color,
+             int x, int y,
+             const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  char text[256];
+  vsnprintf(text, sizeof(text), format, args);
+  
+   // * Creates a SDL_Texture from text
+   SDL_Texture *texture = render_text_as_texture(font, renderer, text, color);
+   // * Render texture onto screen
+  render_texture(texture, renderer, x, y);
+  SDL_DestroyTexture(texture);
+  
+  va_end(args);
 }
 
 int main(void) {
@@ -588,7 +610,13 @@ int main(void) {
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
     }
 
-    render_digits_of_number(renderer, 67, 100, 50);
+    displayf(renderer,
+             font,
+             {255, 255, 0, 255},
+             0, 0,
+             "Ticks: %lums", SDL_GetTicks64() - begin);
+
+    // render_digits_of_number(renderer, 67, 100, 50);
 
     SDL_RenderPresent(renderer);
     update_animat(&walking, SDL_GetTicks64() - begin);
