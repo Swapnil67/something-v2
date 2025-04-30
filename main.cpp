@@ -64,8 +64,8 @@ enum class Tile
   Wall
 };
 
-constexpr int LEVEL_WIDTH = 5;
-constexpr int LEVEL_HEIGHT = 5;
+constexpr int LEVEL_WIDTH = 10;
+constexpr int LEVEL_HEIGHT = 10;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
@@ -475,10 +475,12 @@ int main(void) {
   bool quit = false, debug = false;
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
 
+  constexpr SDL_Rect level_boundary = {0, 0, LEVEL_WIDTH * TILE_SIZE, LEVEL_HEIGHT * TILE_SIZE};
   constexpr int COLLISION_PROBE_SIZE = 10;
   SDL_Rect collision_probe = {}, tile_rect = {};
   Vec2i mouse_position = {};
 
+  uint64_t fps = 0;
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
 
@@ -577,9 +579,13 @@ int main(void) {
       sec(SDL_RenderDrawRect(renderer, &player.hitbox));
       sec(SDL_RenderFillRect(renderer, &collision_probe));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
+      sec(SDL_RenderDrawRect(renderer, &level_boundary));
 
       const uint64_t t = SDL_GetTicks64() - begin;
-      const uint64_t fps = t ? 1000 / t : 0;
+      const uint64_t fps_snapshot = t ? 1000 / t : 0;
+      fps = (fps + fps_snapshot) / 2;
+      
+      constexpr size_t gap = 35;
       displayf(renderer,
                font,
                {0, 255, 0, 255},
@@ -588,12 +594,12 @@ int main(void) {
       displayf(renderer,
                font,
                {255, 0, 0, 255},
-               {0, 20},
+               {0, gap},
                "Mouse Position: (%d %d)", mouse_position.x, mouse_position.y);
       displayf(renderer,
                font,
                {255, 255, 0, 255},
-               {0, 40},
+               {0, gap * 2},
                "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
     }
 
