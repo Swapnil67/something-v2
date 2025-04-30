@@ -69,8 +69,8 @@ constexpr int LEVEL_HEIGHT = 5;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall},
+    {Tile::Empty, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
+    {Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall},
     {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
 };
 
@@ -205,20 +205,17 @@ void update_animat(Animat *animat, Uint64 dt) {
 }
 
 struct Player {
-  // int dx;
-  // int dy;
   Vec2i vel;
   SDL_Rect hitbox;
 };
 
 static inline
-bool is_not_oob(int x, int y) {
-  return 0 <= x && x < LEVEL_WIDTH &&
-         0 <= y && y < LEVEL_HEIGHT;
+bool is_not_oob(Vec2i p) {
+  return 0 <= p.x && p.x < LEVEL_WIDTH && 0 <= p.y && p.y < LEVEL_HEIGHT;
 }
 
 bool is_tile_empty(Vec2i p) {
-  return !is_not_oob(p.x, p.y) || level[p.y][p.x] == Tile::Empty;
+  return !is_not_oob(p) || level[p.y][p.x] == Tile::Empty;
 }
 
 static inline
@@ -238,16 +235,8 @@ void resolve_point_collision(Vec2i *p) {
     return;
   }
 
-  // const int x0 = tile.x * TILE_SIZE;
-  // const int y0 = tile.y * TILE_SIZE;
-  // const int x1 = (tile.x + 1) * TILE_SIZE;
-  // const int y1 = (tile.y + 1) * TILE_SIZE;
-  
   const Vec2i p0 = tile * TILE_SIZE;
   const Vec2i p1 = (tile + 1) * TILE_SIZE;
-
-  // printf("x0: %d, x1: %d\n", p0.x, p0.y);
-  // printf("y0: %d, y1: %d\n", p1.x, p1.y);
 
   struct Side {
     int sqr_distance;
@@ -486,9 +475,9 @@ int main(void) {
   bool quit = false, debug = false;
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
 
-  constexpr int CURSOR_SIZE = 10;
-  SDL_Rect cursor = {}, tile_rect = {};
-  SDL_Rect mouse_position = {};
+  constexpr int COLLISION_PROBE_SIZE = 10;
+  SDL_Rect collision_probe = {}, tile_rect = {};
+  Vec2i mouse_position = {};
 
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
@@ -524,9 +513,9 @@ int main(void) {
           Vec2i p = {event.motion.x, event.motion.y};
           resolve_point_collision(&p);
 
-          cursor = {
-              p.x - CURSOR_SIZE, p.y - CURSOR_SIZE,
-              CURSOR_SIZE * 2, CURSOR_SIZE * 2};
+          collision_probe = {
+              p.x - COLLISION_PROBE_SIZE, p.y - COLLISION_PROBE_SIZE,
+              COLLISION_PROBE_SIZE * 2, COLLISION_PROBE_SIZE * 2};
               
           tile_rect = {
               (event.motion.x / TILE_SIZE) * TILE_SIZE,
@@ -535,6 +524,19 @@ int main(void) {
 
           mouse_position = {event.motion.x, event.motion.y};
         } break;
+        case SDL_MOUSEBUTTONDOWN: {
+          if(debug) {
+            Vec2i tile = vec2(event.motion.x, event.motion.y) / TILE_SIZE;
+            if(is_not_oob(tile)) {
+              if(level[tile.y][tile.x] == Tile::Empty) {
+                level[tile.y][tile.x] = Tile::Wall; 
+              }
+              else {
+                level[tile.y][tile.x] = Tile::Empty;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -573,26 +575,26 @@ int main(void) {
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
       sec(SDL_RenderDrawRect(renderer, &player.hitbox));
-      sec(SDL_RenderFillRect(renderer, &cursor));
+      sec(SDL_RenderFillRect(renderer, &collision_probe));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
 
       const uint64_t t = SDL_GetTicks64() - begin;
       const uint64_t fps = t ? 1000 / t : 0;
-      // displayf(renderer,
-      //          font,
-      //          {255, 255, 0, 255},
-      //          {0, 0},
-      //          "FPS: %lu", fps);
+      displayf(renderer,
+               font,
+               {0, 255, 0, 255},
+               {0, 0},
+               "FPS: %lu", fps);
       displayf(renderer,
                font,
                {255, 0, 0, 255},
-               {0, 0},
+               {0, 20},
                "Mouse Position: (%d %d)", mouse_position.x, mouse_position.y);
       displayf(renderer,
                font,
                {255, 255, 0, 255},
-               {0, 30},
-               "Collision Probe: (%d %d)", cursor.x, cursor.y);
+               {0, 40},
+               "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
     }
 
 
