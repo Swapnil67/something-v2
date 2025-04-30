@@ -347,6 +347,14 @@ SDL_Texture *render_text_as_texture(TTF_Font *font,
   return text_texture;
 }
 
+void render_player(SDL_Renderer *renderer, const Player player) {
+  render_animat(renderer, *player.current, player.hitbox, player.dir);
+}
+
+void update_player(Player *player, Uint64 dt) {
+  update_animat(&player->walking, dt);
+}
+
 void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos)
 {
   int w, h;
@@ -576,8 +584,8 @@ int main(void) {
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
     render_level(renderer, tile_texture);
-    render_animat(renderer, *player.current, player.hitbox, player.dir);
-
+    render_player(renderer, player);
+    
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
@@ -610,7 +618,9 @@ int main(void) {
 
 
     SDL_RenderPresent(renderer);
-    update_animat(&player.walking, SDL_GetTicks64() - begin);
+    const Uint64 dt = SDL_GetTicks64() - begin;
+
+    update_player(&player, dt);
   }
 
   SDL_Quit();
