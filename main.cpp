@@ -6,6 +6,8 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 
+#include "vec2.hpp"
+
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
@@ -68,8 +70,8 @@ Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall},
-    {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty},
+    {Tile::Empty, Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall},
+    {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
 };
 
 struct Sprite {
@@ -203,8 +205,9 @@ void update_animat(Animat *animat, Uint64 dt) {
 }
 
 struct Player {
-  int dx;
-  int dy;
+  // int dx;
+  // int dy;
+  Vec2i vel;
   SDL_Rect hitbox;
 };
 
@@ -214,85 +217,60 @@ bool is_not_oob(int x, int y) {
          0 <= y && y < LEVEL_HEIGHT;
 }
 
-bool is_tile_empty(int x, int y) {
-  return !is_not_oob(x, y) || level[y][x] == Tile::Empty;
+bool is_tile_empty(Vec2i p) {
+  return !is_not_oob(p.x, p.y) || level[p.y][p.x] == Tile::Empty;
 }
 
-int get_sqr_dist(int x0, int y0, int x1, int y1) {
-  int dx = x0 - x1;
-  int dy = y0 - y1;
-  return dx * dx + dy * dy;
+static inline
+int get_sqr_dist(Vec2i p0, Vec2i p1) {
+  auto d = p0 - p1;
+  return d.x * d.x + d.y * d.y;
 }
 
-void resolve_point_collision(int *x, int *y) {
-  assert(x);
-  assert(y);
+void resolve_point_collision(Vec2i *p) {
+  assert(p);
 
-  const int tile_x = *x / TILE_SIZE;
-  const int tile_y = *y / TILE_SIZE;
-  // printf("tile_x: %d, tile_y: %d\n", tile_x, tile_y);
+  const Vec2i tile = *p / TILE_SIZE;
+  printf("tile_x: %d, tile_y: %d\n", tile.x, tile.y);
 
   // * check if player out of bound or standing on empty tile
-  if(!is_not_oob(tile_x, tile_y) || level[tile_y][tile_x] == Tile::Empty) {
+  if(is_tile_empty(tile)) {
     return;
   }
 
-  const int x0 = tile_x * TILE_SIZE;
-  const int x1 = (tile_x + 1) * TILE_SIZE;
-  const int y0 = tile_y * TILE_SIZE;
-  const int y1 = (tile_y + 1) * TILE_SIZE;
+  // const int x0 = tile.x * TILE_SIZE;
+  // const int y0 = tile.y * TILE_SIZE;
+  // const int x1 = (tile.x + 1) * TILE_SIZE;
+  // const int y1 = (tile.y + 1) * TILE_SIZE;
+  
+  const Vec2i p0 = tile * TILE_SIZE;
+  const Vec2i p1 = (tile + 1) * TILE_SIZE;
 
-  // printf("x0: %d, x1: %d\n", x0, x1);
-  // printf("y0: %d, y1: %d\n", y0, y1);
+  // printf("x0: %d, x1: %d\n", p0.x, p0.y);
+  // printf("y0: %d, y1: %d\n", p1.x, p1.y);
 
   struct Side {
     int sqr_distance;
-    int x; int y;
-    int dx; int dy;
+    // int x, y;
+    Vec2i np; // * neighbor positions
+    // int dx, dy,
+    Vec2i nd; // * neighbor direction
     int dd;
   };
 
-  // Side sides[] = {
-  //     // * left
-  //     {std::abs(*x - x0) * std::abs(*x - x0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
-  //     // * right
-  //     {std::abs(x1 - *x) * std::abs(x1 - *x), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
-  //     // * top
-  //     {std::abs(*y - y0) * std::abs(*y - y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
-  //     // * bottom
-  //     {std::abs(y1 - *y) * std::abs(y1 - *y), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
-  //     // * Top Left
-  //     {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(*y - y0) * std::abs(*y - y0),
-  //      x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
-  //     // * Top Right
-  //     {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(*y - y0) * std::abs(*y - y0),
-  //      x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
-  //     // * Bottom Left
-  //     {std::abs(*x - x0) * std::abs(*x - x0) + std::abs(y1 - *y) * std::abs(y1 - *y),
-  //      x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
-  //     // * Bottom Right
-  //     {std::abs(x1 - *x) * std::abs(x1 - *x) + std::abs(y1 - *y) * std::abs(y1 - *y),
-  //      x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
-  // };
+  constexpr size_t TILE_SIZE_SQR = TILE_SIZE * TILE_SIZE;
 
   Side sides[] = {
-      // * left
-      {get_sqr_dist(*x, 0, x0, 0), x0, *y, -1, 0, TILE_SIZE * TILE_SIZE},
-      // * right
-      {get_sqr_dist(x1, 0, *x, 0), x1, *y, 1, 0, TILE_SIZE * TILE_SIZE},
-      // * top
-      {get_sqr_dist(0, *y, 0, y0), *x, y0, 0, -1, TILE_SIZE * TILE_SIZE},
-      // * bottom
-      {get_sqr_dist(0, *y, 0, y1), *x, y1, 0, 1, TILE_SIZE * TILE_SIZE},
-      // * Top Left
-      {get_sqr_dist(x0, y0, *x, *y), x0, y0, -1, -1, (TILE_SIZE * TILE_SIZE) * 2},
-      // * Top Right
-      {get_sqr_dist(x1, y0, *x, *y), x1, y0, 1, -1, (TILE_SIZE * TILE_SIZE) * 2},
-      // * Bottom Left
-      {get_sqr_dist(x0, y1, *x, *y), x0, y1, -1, 1, (TILE_SIZE * TILE_SIZE) * 2},
-      // * Bottom Right
-      {get_sqr_dist(x1, y1, *x, *y), x1, y1, 1, 1, (TILE_SIZE * TILE_SIZE) * 2},
+      {get_sqr_dist({p0.x, 0}, {p->x, 0}), {p0.x, p->y}, {-1, 0}, TILE_SIZE_SQR},            // * Left side
+      {get_sqr_dist({p1.x, 0}, {p->x, 0}), {p1.x, p->y}, {1, 0}, TILE_SIZE_SQR},             // * Right side
+      {get_sqr_dist({0, p0.y}, {0, p->y}), {p->x, p0.y}, {0, -1}, TILE_SIZE_SQR},            // * Top side
+      {get_sqr_dist({0, p1.y}, {0, p->y}), {p->x, p1.y}, {0, 1}, TILE_SIZE_SQR},             // * Bottom side
+      {get_sqr_dist({p0.x, p0.y}, {p->x, p->y}), {p0.x, p0.y}, {-1, -1}, TILE_SIZE_SQR * 2}, // * Top left
+      {get_sqr_dist({p1.x, p0.y}, {p->x, p->y}), {p1.x, p0.y}, {1, -1}, TILE_SIZE_SQR * 2},  // * Top right
+      {get_sqr_dist({p0.x, p1.y}, {p->x, p->y}), {p0.x, p1.y}, {-1, 1}, TILE_SIZE_SQR * 2},  // * Bottom left
+      {get_sqr_dist({p1.x, p1.y}, {p->x, p->y}), {p1.x, p1.y}, {1, 1}, TILE_SIZE_SQR * 2},   // * Bottom right
   };
+
   constexpr int SIDES_COUNT = sizeof(sides) / sizeof(sides[0]);
 
   // printf("*x - x0: %d, \t| *x: %d, x0: %d\n", std::abs(*x - x0), *x, x0);
@@ -308,10 +286,7 @@ void resolve_point_collision(int *x, int *y) {
 
     // * Check for neighbouring tiles
     // * If neighbouring tile is wall, increase the sqr_distance by TILE_SIZE
-    for (int i = 1;
-         !is_tile_empty(tile_x + sides[current_side].dx * i,
-                        tile_y + sides[current_side].dy * i);
-         ++i)
+    for (int i = 1; !is_tile_empty(tile + sides[current_side].nd * i); ++i)
     {
       sides[current_side].sqr_distance += sides[current_side].dd;
     }
@@ -321,60 +296,49 @@ void resolve_point_collision(int *x, int *y) {
     }
   }
 
-  *x = sides[closest_side].x;
-  *y = sides[closest_side].y;
+  *p = sides[closest_side].np;
 }
 
 void resolve_player_collision(Player *player) {
   assert(player);
 
-  // * Four corners of player tilebox
-  int x0 = player->hitbox.x;                       // * bottom left hitbox point
-  int y0 = player->hitbox.y;                       // * top left hitbox point
-  int x1 = player->hitbox.x + player->hitbox.w;    // * bottom right hitbox point
-  int y1 = player->hitbox.y + player->hitbox.h;    // * top right hitbox point
+  Vec2i p0 = vec2(player->hitbox.x, player->hitbox.y);
+  Vec2i p1 = p0 + vec2(player->hitbox.w, player->hitbox.h);
 
-  // printf("x0: %d, x1: %d\n", x0, x1);
-  // printf("y0: %d, y1: %d\n", y0, y1);
-
-  int mesh[][2] = {
-    {x0, y0},
-    {x1, y0},
-    {x0, y1},
-    {x1, y1},
+  Vec2i mesh[] = {
+     p0,
+     {p1.x, p0.y},
+     {p0.x, p1.y},
+     p1,
   };
 
-  constexpr int X = 0;
-  constexpr int Y = 1;
   constexpr int IMPACT_THRESHOLD = 3;
   constexpr int MESH_COUNT = sizeof(mesh) / sizeof(mesh[0]);
   for (int i = 0; i < MESH_COUNT; ++i) {
-    int tx = mesh[i][X];
-    int ty = mesh[i][Y];
-    resolve_point_collision(&tx, &ty);
-    int dx = tx - mesh[i][X];
-    int dy = ty - mesh[i][Y];
+    Vec2i t = mesh[i];
 
-    // printf("dx: %d, dy: %d\n", dx, dy);
-    if (std::abs(dy) >= IMPACT_THRESHOLD) {
-      player->dy = 0;
+    resolve_point_collision(&t);
+    Vec2i d = t - mesh[i]; 
+
+    // printf("dx: %d, dy: %d\n", d.x, d.y);
+    if (std::abs(d.y) >= IMPACT_THRESHOLD) {
+      player->vel.y = 0;
     }
 
-    if (std::abs(dx) >= IMPACT_THRESHOLD) {
-      player->dx = 0;
+    if (std::abs(d.x) >= IMPACT_THRESHOLD) {
+      player->vel.x = 0;
     }
 
     for(int j = 0;  j < MESH_COUNT; ++j) {
-      mesh[j][X] += dx;
-      mesh[j][Y] += dy;
+      mesh[j] += d;
     }
   }
 
   static_assert(MESH_COUNT >= 1);
 
-  // * Take th first point in mesh and update player x & y
-  player->hitbox.x = mesh[0][X];
-  player->hitbox.y = mesh[0][Y];
+  // * Take the first point in mesh and update player x & y
+  player->hitbox.x = mesh[0].x;
+  player->hitbox.y = mesh[0].y;
 }
 
 // * Creates a SDL_Texture from text
@@ -388,11 +352,12 @@ SDL_Texture *render_text_as_texture(TTF_Font *font,
   return text_texture;
 }
 
-void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, int x, int y) {
+void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos)
+{
   int w, h;
   sec(SDL_QueryTexture(texture, nullptr, nullptr, &w, &h));
   SDL_Rect srcrect = {0, 0, w, h};
-  SDL_Rect dstrect = {x, y, w, h};
+  SDL_Rect dstrect = {pos.x, pos.y, w, h};
   sec(SDL_RenderCopy(renderer, texture, &srcrect, &dstrect));
 }
 
@@ -401,12 +366,12 @@ SDL_Texture *digits_textures[DIGITS_COUNT];
 
 void render_digits_of_number(SDL_Renderer *renderer,
                    int64_t number,
-                   int x, int y) {
+                   Vec2i pos) {
 
   if(number == 0) {
     // * render 0
     static_assert(DIGITS_COUNT > 1);
-    render_texture(digits_textures[0], renderer, x, y);
+    render_texture(digits_textures[0], renderer, pos);
     return;
   }
 
@@ -416,12 +381,12 @@ void render_digits_of_number(SDL_Renderer *renderer,
 
   while(number != 0) {
     int d = number % 10;
-    render_texture(digits_textures[d], renderer, x, y);
+    render_texture(digits_textures[d], renderer, pos);
 
     int w, h;
     sec(SDL_QueryTexture(digits_textures[d], nullptr, nullptr, &w, &h));
 
-    x -= w;
+    pos.x -= w;
 
     number = number / 10;
   }
@@ -430,7 +395,7 @@ void render_digits_of_number(SDL_Renderer *renderer,
 void displayf(SDL_Renderer *renderer,
              TTF_Font *font,
              SDL_Color color,
-             int x, int y,
+             Vec2i pos,
              const char *format, ...)
 {
   va_list args;
@@ -442,7 +407,7 @@ void displayf(SDL_Renderer *renderer,
    // * Creates a SDL_Texture from text
    SDL_Texture *texture = render_text_as_texture(font, renderer, text, color);
    // * Render texture onto screen
-  render_texture(texture, renderer, x, y);
+  render_texture(texture, renderer, pos);
   SDL_DestroyTexture(texture);
   
   va_end(args);
@@ -465,12 +430,12 @@ int main(void) {
 
   // load font.ttf at size 16 into font
   stec(TTF_Init());
-  TTF_Font *font = stec(TTF_OpenFont("assets/Comic-Sans-MS.ttf", 64));
-  for(size_t i = 0 ; i < DIGITS_COUNT; ++i) {
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "%zu", i);
-    digits_textures[i] = render_text_as_texture(font, renderer, buffer, {255, 0, 0, 255});
-  }
+  TTF_Font *font = stec(TTF_OpenFont("assets/Comic-Sans-MS.ttf", 24));
+  // for(size_t i = 0 ; i < DIGITS_COUNT; ++i) {
+  //   char buffer[256];
+  //   snprintf(buffer, sizeof(buffer), "%zu", i);
+  //   digits_textures[i] = render_text_as_texture(font, renderer, buffer, {255, 0, 0, 255});
+  // }
 
   // * Tile Texture
   SDL_Texture *tileset_texture =
@@ -513,10 +478,8 @@ int main(void) {
   Animat *current = &idle;
 
   // * Define Player
-  Player player = {
-      .dy = 0,
-      .hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
-      
+  Player player = {.hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
+
   SDL_RendererFlip player_dir = SDL_FLIP_NONE;
       
   int ddy = 1;
@@ -525,6 +488,7 @@ int main(void) {
 
   constexpr int CURSOR_SIZE = 10;
   SDL_Rect cursor = {}, tile_rect = {};
+  SDL_Rect mouse_position = {};
 
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
@@ -538,7 +502,7 @@ int main(void) {
         case SDL_KEYDOWN: {
           switch (event.key.keysym.sym) {
           case SDLK_SPACE: {
-            player.dy = -20;
+            player.vel.y = -20;
           } break;
           case SDLK_l: {
             quit = true;
@@ -547,7 +511,7 @@ int main(void) {
             debug = !debug;
           } break;
           case SDLK_r: {
-            player.dy = 0;
+            player.vel.y = 0;
             player.hitbox.x = 0;
             player.hitbox.y = 0;
           } break;
@@ -557,41 +521,44 @@ int main(void) {
           }
         } break;
         case SDL_MOUSEMOTION: {
-          auto x = event.motion.x;
-          auto y = event.motion.y;
+          Vec2i p = {event.motion.x, event.motion.y};
+          resolve_point_collision(&p);
+
+          cursor = {
+              p.x - CURSOR_SIZE, p.y - CURSOR_SIZE,
+              CURSOR_SIZE * 2, CURSOR_SIZE * 2};
+              
           tile_rect = {
               (event.motion.x / TILE_SIZE) * TILE_SIZE,
               (event.motion.y / TILE_SIZE) * TILE_SIZE,
               TILE_SIZE, TILE_SIZE};
-          resolve_point_collision(&x, &y);
-          cursor = {
-              x - CURSOR_SIZE, y - CURSOR_SIZE,
-              CURSOR_SIZE * 2, CURSOR_SIZE * 2};
+
+          mouse_position = {event.motion.x, event.motion.y};
         } break;
       }
     }
 
     // * Update state
     if(keyboard[SDL_SCANCODE_D]) {
-      player.dx = PLAYER_SPEED;
+      player.vel.x = PLAYER_SPEED;
       current = &walking;
       player_dir = SDL_FLIP_NONE;
     }
     else if (keyboard[SDL_SCANCODE_A]) {
-      player.dx = -PLAYER_SPEED;
+      player.vel.x = -PLAYER_SPEED;
       current = &walking;
       player_dir = SDL_FLIP_HORIZONTAL;
     }
     else {
       current = &idle;
-      player.dx = 0;
+      player.vel.x = 0;
       player_dir = SDL_FLIP_NONE;
     }
 
-    // * Add gravity to player dy
-    player.dy += ddy;
-    player.hitbox.x += player.dx;
-    player.hitbox.y += player.dy;
+    // * Add gravity to player 'y' velocity
+    player.vel.y += ddy;
+    player.hitbox.x += player.vel.x;
+    player.hitbox.y += player.vel.y;
 
     // * Resolve player collision
     resolve_player_collision(&player);
@@ -608,15 +575,26 @@ int main(void) {
       sec(SDL_RenderDrawRect(renderer, &player.hitbox));
       sec(SDL_RenderFillRect(renderer, &cursor));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
+
+      const uint64_t t = SDL_GetTicks64() - begin;
+      const uint64_t fps = t ? 1000 / t : 0;
+      // displayf(renderer,
+      //          font,
+      //          {255, 255, 0, 255},
+      //          {0, 0},
+      //          "FPS: %lu", fps);
+      displayf(renderer,
+               font,
+               {255, 0, 0, 255},
+               {0, 0},
+               "Mouse Position: (%d %d)", mouse_position.x, mouse_position.y);
+      displayf(renderer,
+               font,
+               {255, 255, 0, 255},
+               {0, 30},
+               "Collision Probe: (%d %d)", cursor.x, cursor.y);
     }
 
-    displayf(renderer,
-             font,
-             {255, 255, 0, 255},
-             0, 0,
-             "Ticks: %lums", SDL_GetTicks64() - begin);
-
-    // render_digits_of_number(renderer, 67, 100, 50);
 
     SDL_RenderPresent(renderer);
     update_animat(&walking, SDL_GetTicks64() - begin);

@@ -10,5 +10,6 @@ sdl-playground
 # *.vscode
 
 
+non_vector_main.cpp
 notes.md
 collision_detection.md
