@@ -207,6 +207,12 @@ void update_animat(Animat *animat, Uint64 dt) {
 struct Player {
   Vec2i vel;
   SDL_Rect hitbox;
+
+  Animat idle;
+  Animat walking;
+  Animat *current;
+
+  SDL_RendererFlip dir;
 };
 
 static inline
@@ -228,7 +234,7 @@ void resolve_point_collision(Vec2i *p) {
   assert(p);
 
   const Vec2i tile = *p / TILE_SIZE;
-  printf("tile_x: %d, tile_y: %d\n", tile.x, tile.y);
+  // printf("tile_x: %d, tile_y: %d\n", tile.x, tile.y);
 
   // * check if player out of bound or standing on empty tile
   if(is_tile_empty(tile)) {
@@ -447,16 +453,19 @@ int main(void) {
     walking_frames[i].texture = walking_texture;
   }
 
+  // * Define Player
+  Player player = {.hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
+
   // * Player Animation
-  Animat walking = {
+  player.walking = {
       .frames = walking_frames,
       .frames_count = 4,
       .frame_current = 0,
       .frame_duration = 100,
       .frame_cooldown = 100};
-
+ 
   // * Player Idle Animation
-  Animat idle = {
+  player.idle = {
       .frames = walking_frames + 2, // * 3rd frame
       .frames_count = 1,
       .frame_current = 0,
@@ -464,12 +473,8 @@ int main(void) {
       .frame_cooldown = 0};
 
   // * Current player animation
-  Animat *current = &idle;
-
-  // * Define Player
-  Player player = {.hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
-
-  SDL_RendererFlip player_dir = SDL_FLIP_NONE;
+  player.current = &player.idle;
+  player.dir = SDL_FLIP_NONE;
       
   int ddy = 1;
   bool quit = false, debug = false;
@@ -545,18 +550,18 @@ int main(void) {
     // * Update state
     if(keyboard[SDL_SCANCODE_D]) {
       player.vel.x = PLAYER_SPEED;
-      current = &walking;
-      player_dir = SDL_FLIP_NONE;
+      player.current = &player.walking;
+      player.dir = SDL_FLIP_NONE;
     }
     else if (keyboard[SDL_SCANCODE_A]) {
       player.vel.x = -PLAYER_SPEED;
-      current = &walking;
-      player_dir = SDL_FLIP_HORIZONTAL;
+      player.current = &player.walking;
+      player.dir = SDL_FLIP_HORIZONTAL;
     }
     else {
-      current = &idle;
+      player.current = &player.idle;
       player.vel.x = 0;
-      player_dir = SDL_FLIP_NONE;
+      player.dir = SDL_FLIP_NONE;
     }
 
     // * Add gravity to player 'y' velocity
@@ -571,7 +576,7 @@ int main(void) {
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
     render_level(renderer, tile_texture);
-    render_animat(renderer, *current, player.hitbox, player_dir);
+    render_animat(renderer, *player.current, player.hitbox, player.dir);
 
     // * Show player hitbox
     if(debug) {
@@ -605,7 +610,7 @@ int main(void) {
 
 
     SDL_RenderPresent(renderer);
-    update_animat(&walking, SDL_GetTicks64() - begin);
+    update_animat(&player.walking, SDL_GetTicks64() - begin);
   }
 
   SDL_Quit();
