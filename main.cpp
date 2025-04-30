@@ -205,8 +205,9 @@ void update_animat(Animat *animat, Uint64 dt) {
 }
 
 struct Player {
+  Vec2i pos;
   Vec2i vel;
-  SDL_Rect hitbox;
+  SDL_Rect texbox;
 
   Animat idle;
   Animat walking;
@@ -297,8 +298,8 @@ void resolve_point_collision(Vec2i *p) {
 void resolve_player_collision(Player *player) {
   assert(player);
 
-  Vec2i p0 = vec2(player->hitbox.x, player->hitbox.y);
-  Vec2i p1 = p0 + vec2(player->hitbox.w, player->hitbox.h);
+  Vec2i p0 = vec2(player->texbox.x, player->texbox.y) + player->pos;
+  Vec2i p1 = p0 + vec2(player->texbox.w, player->texbox.h);
 
   Vec2i mesh[] = {
      p0,
@@ -327,13 +328,14 @@ void resolve_player_collision(Player *player) {
     for(int j = 0;  j < MESH_COUNT; ++j) {
       mesh[j] += d;
     }
+    player->pos += d;
   }
 
-  static_assert(MESH_COUNT >= 1);
+  // static_assert(MESH_COUNT >= 1);
 
-  // * Take the first point in mesh and update player x & y
-  player->hitbox.x = mesh[0].x;
-  player->hitbox.y = mesh[0].y;
+  // // * Take the first point in mesh and update player x & y
+  // player->texbox.x = mesh[0].x;
+  // player->texbox.y = mesh[0].y;
 }
 
 // * Creates a SDL_Texture from text
@@ -347,8 +349,17 @@ SDL_Texture *render_text_as_texture(TTF_Font *font,
   return text_texture;
 }
 
+
+SDL_Rect get_player_dstrect(const Player player) {
+  SDL_Rect dstrect = {
+      player.texbox.x + player.pos.x, player.texbox.y + player.pos.y,
+      player.texbox.w, player.texbox.h};
+  return dstrect;
+}
+
 void render_player(SDL_Renderer *renderer, const Player player) {
-  render_animat(renderer, *player.current, player.hitbox, player.dir);
+  SDL_Rect player_dstrect = get_player_dstrect(player);
+  render_animat(renderer, *player.current, player_dstrect, player.dir);
 }
 
 void update_player(Player *player, Uint64 dt) {
@@ -462,7 +473,9 @@ int main(void) {
   }
 
   // * Define Player
-  Player player = {.hitbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}};
+  Player player = {
+    .texbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}
+  };
 
   // * Player Animation
   player.walking = {
@@ -516,8 +529,7 @@ int main(void) {
           } break;
           case SDLK_r: {
             player.vel.y = 0;
-            player.hitbox.x = 0;
-            player.hitbox.y = 0;
+            player.pos = vec2(0, 0);
           } break;
 
           default:
@@ -574,8 +586,7 @@ int main(void) {
 
     // * Add gravity to player 'y' velocity
     player.vel.y += ddy;
-    player.hitbox.x += player.vel.x;
-    player.hitbox.y += player.vel.y;
+    player.pos += player.vel;
 
     // * Resolve player collision
     resolve_player_collision(&player);
@@ -589,7 +600,10 @@ int main(void) {
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
-      sec(SDL_RenderDrawRect(renderer, &player.hitbox));
+      
+      SDL_Rect player_dstrect = get_player_dstrect(player);
+      sec(SDL_RenderDrawRect(renderer, &player_dstrect));
+
       sec(SDL_RenderFillRect(renderer, &collision_probe));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
       sec(SDL_RenderDrawRect(renderer, &level_boundary));
