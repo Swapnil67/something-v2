@@ -16,10 +16,12 @@
 
 #define COLOR_BLACK 0x00, 0x00, 0x00, 0xff
 #define COLOR_RED 0xff, 0x00, 0x00, 0xff
+#define COLOR_YELLOW 0xff, 0xff, 0x00, 0xff
 
 constexpr int TILE_SIZE = 64;
-constexpr int PLAYER_SIZE = 48;
 constexpr int PLAYER_SPEED = 2;
+constexpr int PLAYER_TEXBOX_SIZE = 48;
+constexpr int PLAYER_HITBOX_SIZE = (PLAYER_TEXBOX_SIZE - 10);
 
 template <typename T>
 T *stec(T *ptr) {
@@ -79,6 +81,15 @@ struct Sprite {
   SDL_Texture *texture;
 };
 
+static inline
+bool is_not_oob(Vec2i p) {
+  return 0 <= p.x && p.x < LEVEL_WIDTH && 0 <= p.y && p.y < LEVEL_HEIGHT;
+}
+
+bool is_tile_empty(Vec2i p) {
+  return !is_not_oob(p) || level[p.y][p.x] == Tile::Empty;
+}
+
 void render_sprite(SDL_Renderer *renderer,
                    Sprite texture,
                    SDL_Rect dstrect,
@@ -92,7 +103,7 @@ void render_sprite(SDL_Renderer *renderer,
                        flip));
 }
 
-void render_level(SDL_Renderer *renderer, Sprite wall_texture)
+void render_level(SDL_Renderer *renderer, Sprite top_ground_texture, Sprite bottom_ground_texture)
 {
   for (int y = 0; y < LEVEL_HEIGHT; ++y) {
     for (int x = 0; x < LEVEL_WIDTH; ++x) {
@@ -106,9 +117,18 @@ void render_level(SDL_Renderer *renderer, Sprite wall_texture)
             x * TILE_SIZE,
             y * TILE_SIZE,
             TILE_SIZE, TILE_SIZE};
-            render_sprite(renderer,
-                            wall_texture,
-                            dstrect);
+        if (is_tile_empty(vec2(x, y - 1)))
+        {
+          render_sprite(renderer,
+                        top_ground_texture,
+                        dstrect);
+        }
+        else
+        {
+          render_sprite(renderer,
+                          bottom_ground_texture,
+                          dstrect);
+        }
       }
       break;
 
@@ -208,6 +228,7 @@ struct Player {
   Vec2i pos;
   Vec2i vel;
   SDL_Rect texbox;
+  SDL_Rect hitbox;
 
   Animat idle;
   Animat walking;
@@ -215,15 +236,6 @@ struct Player {
 
   SDL_RendererFlip dir;
 };
-
-static inline
-bool is_not_oob(Vec2i p) {
-  return 0 <= p.x && p.x < LEVEL_WIDTH && 0 <= p.y && p.y < LEVEL_HEIGHT;
-}
-
-bool is_tile_empty(Vec2i p) {
-  return !is_not_oob(p) || level[p.y][p.x] == Tile::Empty;
-}
 
 static inline
 int get_sqr_dist(Vec2i p0, Vec2i p1) {
@@ -298,8 +310,8 @@ void resolve_point_collision(Vec2i *p) {
 void resolve_player_collision(Player *player) {
   assert(player);
 
-  Vec2i p0 = vec2(player->texbox.x, player->texbox.y) + player->pos;
-  Vec2i p1 = p0 + vec2(player->texbox.w, player->texbox.h);
+  Vec2i p0 = vec2(player->hitbox.x, player->hitbox.y) + player->pos;
+  Vec2i p1 = p0 + vec2(player->hitbox.w, player->hitbox.h);
 
   Vec2i mesh[] = {
      p0,
@@ -330,12 +342,6 @@ void resolve_player_collision(Player *player) {
     }
     player->pos += d;
   }
-
-  // static_assert(MESH_COUNT >= 1);
-
-  // // * Take the first point in mesh and update player x & y
-  // player->texbox.x = mesh[0].x;
-  // player->texbox.y = mesh[0].y;
 }
 
 // * Creates a SDL_Texture from text
@@ -349,16 +355,22 @@ SDL_Texture *render_text_as_texture(TTF_Font *font,
   return text_texture;
 }
 
-
-SDL_Rect get_player_dstrect(const Player player) {
+SDL_Rect get_player_texbox(const Player player) {
   SDL_Rect dstrect = {
       player.texbox.x + player.pos.x, player.texbox.y + player.pos.y,
       player.texbox.w, player.texbox.h};
   return dstrect;
 }
 
+SDL_Rect get_player_hitbox(const Player player) {
+  SDL_Rect hitbox = {
+      player.hitbox.x + player.pos.x, player.hitbox.y + player.pos.y,
+      player.hitbox.w, player.hitbox.h};
+  return hitbox;
+}
+
 void render_player(SDL_Renderer *renderer, const Player player) {
-  SDL_Rect player_dstrect = get_player_dstrect(player);
+  SDL_Rect player_dstrect = get_player_texbox(player);
   render_animat(renderer, *player.current, player_dstrect, player.dir);
 }
 
@@ -366,8 +378,7 @@ void update_player(Player *player, Uint64 dt) {
   update_animat(&player->walking, dt);
 }
 
-void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos)
-{
+void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos) {
   int w, h;
   sec(SDL_QueryTexture(texture, nullptr, nullptr, &w, &h));
   SDL_Rect srcrect = {0, 0, w, h};
@@ -377,34 +388,6 @@ void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos)
 
 constexpr size_t DIGITS_COUNT = 120;
 SDL_Texture *digits_textures[DIGITS_COUNT];
-
-void render_digits_of_number(SDL_Renderer *renderer,
-                   int64_t number,
-                   Vec2i pos) {
-
-  if(number == 0) {
-    // * render 0
-    static_assert(DIGITS_COUNT > 1);
-    render_texture(digits_textures[0], renderer, pos);
-    return;
-  }
-
-  if(number < 0) {
-    // * render -
-  }
-
-  while(number != 0) {
-    int d = number % 10;
-    render_texture(digits_textures[d], renderer, pos);
-
-    int w, h;
-    sec(SDL_QueryTexture(digits_textures[d], nullptr, nullptr, &w, &h));
-
-    pos.x -= w;
-
-    number = number / 10;
-  }
-}
 
 void displayf(SDL_Renderer *renderer,
              TTF_Font *font,
@@ -427,6 +410,12 @@ void displayf(SDL_Renderer *renderer,
   va_end(args);
 }
 
+enum class Debug_Draw_State {
+  Idle,
+  Create,
+  Delete
+};
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -445,18 +434,16 @@ int main(void) {
   // load font.ttf at size 16 into font
   stec(TTF_Init());
   TTF_Font *font = stec(TTF_OpenFont("assets/Comic-Sans-MS.ttf", 24));
-  // for(size_t i = 0 ; i < DIGITS_COUNT; ++i) {
-  //   char buffer[256];
-  //   snprintf(buffer, sizeof(buffer), "%zu", i);
-  //   digits_textures[i] = render_text_as_texture(font, renderer, buffer, {255, 0, 0, 255});
-  // }
 
   // * Tile Texture
   SDL_Texture *tileset_texture =
       load_texture_from_png(renderer, TILES_FILEPATH);
-  Sprite tile_texture = {
-    .rect = {120, 128, 16, 16},
+  Sprite ground_grass_texture = {
+    .rect = {120, 128, 32, 32},
     .texture = tileset_texture};
+  Sprite ground_texture = {
+      .rect = {120, 128 + 10, 22, 22},
+      .texture = tileset_texture};
 
   // * Player Texture
   SDL_Texture *walking_texture =
@@ -465,17 +452,18 @@ int main(void) {
   Sprite walking_frames[walking_frame_count];
   for (int i = 0; i < walking_frame_count; ++i) {
     walking_frames[i].rect = {
-        .x = i * PLAYER_SIZE,
+        .x = i * PLAYER_TEXBOX_SIZE,
         .y = 0,
-        .w = PLAYER_SIZE,
-        .h = PLAYER_SIZE};
+        .w = PLAYER_TEXBOX_SIZE,
+        .h = PLAYER_TEXBOX_SIZE};
     walking_frames[i].texture = walking_texture;
   }
 
   // * Define Player
   Player player = {
-    .texbox = {0, 0, PLAYER_SIZE, PLAYER_SIZE}
-  };
+      .texbox = {
+          -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE},
+      .hitbox = {-(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE}};
 
   // * Player Animation
   player.walking = {
@@ -505,6 +493,7 @@ int main(void) {
   constexpr int COLLISION_PROBE_SIZE = 10;
   SDL_Rect collision_probe = {}, tile_rect = {};
   Vec2i mouse_position = {};
+  Debug_Draw_State state = Debug_Draw_State::Idle;
 
   uint64_t fps = 0;
   while (!quit) {
@@ -550,20 +539,39 @@ int main(void) {
               TILE_SIZE, TILE_SIZE};
 
           mouse_position = {event.motion.x, event.motion.y};
+
+          Vec2i tile = vec2(event.motion.x, event.motion.y) / TILE_SIZE;
+          switch(state) {
+            case Debug_Draw_State::Idle: {
+            } break;
+            case Debug_Draw_State::Create: {
+              level[tile.y][tile.x] = Tile::Wall;
+            } break;
+            case Debug_Draw_State::Delete: {
+              level[tile.y][tile.x] = Tile::Empty;
+            } break;
+            default: {}
+          }
+
         } break;
         case SDL_MOUSEBUTTONDOWN: {
           if(debug) {
             Vec2i tile = vec2(event.motion.x, event.motion.y) / TILE_SIZE;
             if(is_not_oob(tile)) {
               if(level[tile.y][tile.x] == Tile::Empty) {
-                level[tile.y][tile.x] = Tile::Wall; 
+                state = Debug_Draw_State::Create;
+                level[tile.y][tile.x] = Tile::Wall;
               }
               else {
+                state = Debug_Draw_State::Delete;
                 level[tile.y][tile.x] = Tile::Empty;
               }
             }
           }
-        }
+        } break;
+        case SDL_MOUSEBUTTONUP: {
+          state = Debug_Draw_State::Idle; 
+        } break;
       }
     }
 
@@ -594,14 +602,14 @@ int main(void) {
     // * Render state
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
-    render_level(renderer, tile_texture);
+    render_level(renderer, ground_grass_texture, ground_texture);
     render_player(renderer, player);
     
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
       
-      SDL_Rect player_dstrect = get_player_dstrect(player);
+      SDL_Rect player_dstrect = get_player_texbox(player);
       sec(SDL_RenderDrawRect(renderer, &player_dstrect));
 
       sec(SDL_RenderFillRect(renderer, &collision_probe));
@@ -613,11 +621,11 @@ int main(void) {
       fps = (fps + fps_snapshot) / 2;
       
       constexpr size_t gap = 35;
-      displayf(renderer,
-               font,
-               {0, 255, 0, 255},
-               {0, 0},
-               "FPS: %lu", fps);
+      // displayf(renderer,
+      //          font,
+      //          {0, 255, 0, 255},
+      //          {0, 0},
+      //          "FPS: %lu", fps);
       displayf(renderer,
                font,
                {255, 0, 0, 255},
@@ -628,6 +636,12 @@ int main(void) {
                {255, 255, 0, 255},
                {0, gap * 2},
                "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
+
+
+      sec(SDL_SetRenderDrawColor(renderer, COLOR_YELLOW));
+      SDL_Rect player_hitbox = get_player_hitbox(player);
+      sec(SDL_RenderDrawRect(renderer, &player_hitbox));
+         
     }
 
 
