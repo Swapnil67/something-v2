@@ -545,10 +545,12 @@ int main(void) {
             case Debug_Draw_State::Idle: {
             } break;
             case Debug_Draw_State::Create: {
+              if (is_not_oob(tile))
               level[tile.y][tile.x] = Tile::Wall;
             } break;
             case Debug_Draw_State::Delete: {
-              level[tile.y][tile.x] = Tile::Empty;
+              if (is_not_oob(tile))
+                level[tile.y][tile.x] = Tile::Empty;
             } break;
             default: {}
           }
