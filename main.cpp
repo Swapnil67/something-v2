@@ -82,12 +82,12 @@ struct Sprite {
 };
 
 static inline
-bool is_not_oob(Vec2i p) {
+bool is_tile_oob(Vec2i p) {
   return 0 <= p.x && p.x < LEVEL_WIDTH && 0 <= p.y && p.y < LEVEL_HEIGHT;
 }
 
 bool is_tile_empty(Vec2i p) {
-  return !is_not_oob(p) || level[p.y][p.x] == Tile::Empty;
+  return !is_tile_oob(p) || level[p.y][p.x] == Tile::Empty;
 }
 
 void render_sprite(SDL_Renderer *renderer,
@@ -545,11 +545,11 @@ int main(void) {
             case Debug_Draw_State::Idle: {
             } break;
             case Debug_Draw_State::Create: {
-              if (is_not_oob(tile))
+              if (is_tile_oob(tile))
               level[tile.y][tile.x] = Tile::Wall;
             } break;
             case Debug_Draw_State::Delete: {
-              if (is_not_oob(tile))
+              if (is_tile_oob(tile))
                 level[tile.y][tile.x] = Tile::Empty;
             } break;
             default: {}
@@ -559,7 +559,7 @@ int main(void) {
         case SDL_MOUSEBUTTONDOWN: {
           if(debug) {
             Vec2i tile = vec2(event.motion.x, event.motion.y) / TILE_SIZE;
-            if(is_not_oob(tile)) {
+            if(is_tile_oob(tile)) {
               if(level[tile.y][tile.x] == Tile::Empty) {
                 state = Debug_Draw_State::Create;
                 level[tile.y][tile.x] = Tile::Wall;
