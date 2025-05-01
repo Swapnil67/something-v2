@@ -18,10 +18,10 @@
 #define COLOR_RED 0xff, 0x00, 0x00, 0xff
 #define COLOR_YELLOW 0xff, 0xff, 0x00, 0xff
 
-constexpr int TILE_SIZE = 64;
-constexpr int PLAYER_SPEED = 2;
-constexpr int PLAYER_TEXBOX_SIZE = 48;
-constexpr int PLAYER_HITBOX_SIZE = (PLAYER_TEXBOX_SIZE - 10);
+const int TILE_SIZE = 64;
+const int PLAYER_SPEED = 2;
+const int PLAYER_TEXBOX_SIZE = 48;
+const int PLAYER_HITBOX_SIZE = (PLAYER_TEXBOX_SIZE - 10);
 
 template <typename T>
 T *stec(T *ptr) {
@@ -66,8 +66,8 @@ enum class Tile
   Wall
 };
 
-constexpr int LEVEL_WIDTH = 10;
-constexpr int LEVEL_HEIGHT = 10;
+const int LEVEL_WIDTH = 10;
+const int LEVEL_HEIGHT = 10;
 Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
     {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
@@ -266,7 +266,7 @@ void resolve_point_collision(Vec2i *p) {
     int dd;
   };
 
-  constexpr size_t TILE_SIZE_SQR = TILE_SIZE * TILE_SIZE;
+  const size_t TILE_SIZE_SQR = TILE_SIZE * TILE_SIZE;
 
   Side sides[] = {
       {get_sqr_dist({p0.x, 0}, {p->x, 0}), {p0.x, p->y}, {-1, 0}, TILE_SIZE_SQR},            // * Left side
@@ -279,7 +279,7 @@ void resolve_point_collision(Vec2i *p) {
       {get_sqr_dist({p1.x, p1.y}, {p->x, p->y}), {p1.x, p1.y}, {1, 1}, TILE_SIZE_SQR * 2},   // * Bottom right
   };
 
-  constexpr int SIDES_COUNT = sizeof(sides) / sizeof(sides[0]);
+  const int SIDES_COUNT = sizeof(sides) / sizeof(sides[0]);
 
   // printf("*x - x0: %d, \t| *x: %d, x0: %d\n", std::abs(*x - x0), *x, x0);
   // printf("x1 - *x: %d, \t| x1: %d, *x: %d\n", std::abs(x1 - *x), x1, *x);
@@ -320,8 +320,8 @@ void resolve_player_collision(Player *player) {
      p1,
   };
 
-  constexpr int IMPACT_THRESHOLD = 3;
-  constexpr int MESH_COUNT = sizeof(mesh) / sizeof(mesh[0]);
+  const int IMPACT_THRESHOLD = 3;
+  const int MESH_COUNT = sizeof(mesh) / sizeof(mesh[0]);
   for (int i = 0; i < MESH_COUNT; ++i) {
     Vec2i t = mesh[i];
 
@@ -386,7 +386,7 @@ void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos) {
   sec(SDL_RenderCopy(renderer, texture, &srcrect, &dstrect));
 }
 
-constexpr size_t DIGITS_COUNT = 120;
+const size_t DIGITS_COUNT = 120;
 SDL_Texture *digits_textures[DIGITS_COUNT];
 
 void displayf(SDL_Renderer *renderer,
@@ -448,7 +448,7 @@ int main(void) {
   // * Player Texture
   SDL_Texture *walking_texture =
       load_texture_from_png(renderer, WALKING_FILEPATH);
-  constexpr int walking_frame_count = 4;
+  const int walking_frame_count = 4;
   Sprite walking_frames[walking_frame_count];
   for (int i = 0; i < walking_frame_count; ++i) {
     walking_frames[i].rect = {
@@ -489,8 +489,8 @@ int main(void) {
   bool quit = false, debug = false;
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
 
-  constexpr SDL_Rect level_boundary = {0, 0, LEVEL_WIDTH * TILE_SIZE, LEVEL_HEIGHT * TILE_SIZE};
-  constexpr int COLLISION_PROBE_SIZE = 10;
+  const SDL_Rect level_boundary = {0, 0, LEVEL_WIDTH * TILE_SIZE, LEVEL_HEIGHT * TILE_SIZE};
+  const int COLLISION_PROBE_SIZE = 10;
   SDL_Rect collision_probe = {}, tile_rect = {};
   Vec2i mouse_position = {};
   Debug_Draw_State state = Debug_Draw_State::Idle;
@@ -620,12 +620,7 @@ int main(void) {
       const uint64_t fps_snapshot = t ? 1000 / t : 0;
       fps = (fps + fps_snapshot) / 2;
       
-      constexpr size_t gap = 35;
-      // displayf(renderer,
-      //          font,
-      //          {0, 255, 0, 255},
-      //          {0, 0},
-      //          "FPS: %lu", fps);
+      const size_t gap = 35;
       displayf(renderer,
                font,
                {255, 0, 0, 255},
@@ -637,11 +632,9 @@ int main(void) {
                {0, gap * 2},
                "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
 
-
       sec(SDL_SetRenderDrawColor(renderer, COLOR_YELLOW));
       SDL_Rect player_hitbox = get_player_hitbox(player);
       sec(SDL_RenderDrawRect(renderer, &player_hitbox));
-         
     }
 
 
