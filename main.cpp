@@ -13,6 +13,8 @@
 
 #define TILES_FILEPATH "assets/sprites/fantasy_tiles.png"
 #define WALKING_FILEPATH "assets/sprites/walking-12px.png"
+#define PROJECTILE_SPARK_FILEPATH "assets/sprites/spark-sheet.png"
+#define PROJECTILE_DESTORY_FILEPATH "assets/sprites/destroy-sheet.png"
 
 #define COLOR_BLACK 0x00, 0x00, 0x00, 0xff
 #define COLOR_RED 0xff, 0x00, 0x00, 0xff
@@ -416,6 +418,142 @@ enum class Debug_Draw_State {
   Delete
 };
 
+Animat load_spritesheet_animat(SDL_Renderer *renderer,
+                               size_t frame_count,
+                               uint32_t frame_duration,
+                               const char *spritsheet_filepath)
+{
+  Animat result = {
+    .frames = new Sprite[frame_count],
+    .frames_count = frame_count,
+    .frame_duration = frame_duration
+  };
+
+  // * Load the SDL_Texture from png file
+  SDL_Texture *spritesheet_texture = load_texture_from_png(renderer, spritsheet_filepath);
+
+  // * Get the texture width & height
+  int spritesheet_w = 0, spritesheet_h = 0;
+  SDL_QueryTexture(spritesheet_texture, nullptr, nullptr, &spritesheet_w, &spritesheet_h);
+  
+  // * Create Sprites from the texture information
+  int sprit_w = spritesheet_w / (int) frame_count;
+  int sprit_h = spritesheet_h; // * We only handle horizontal sprites
+
+  for(int i = 0; i < (int)frame_count; ++i) {
+    result.frames[i].rect = {
+      .x = i * sprit_w,
+      .y = 0,
+      .w = sprit_w,
+      .h = sprit_h};
+    result.frames[i].texture = spritesheet_texture;
+  }
+
+  return result;
+}
+
+enum class Projectile_State {
+  Ded = 0,
+  Active,
+  Poof
+};
+
+struct Projectile {
+  Projectile_State state;
+  Vec2i pos;
+  Vec2i vel;
+  Animat poof_animat;
+  Animat active_animat;
+  SDL_RendererFlip dir; 
+};
+
+const size_t projectiles_count = 69;
+Projectile projectiles[projectiles_count] = {};
+
+void init_projectiles(Animat active_animat, Animat poof_animat) {
+  for (size_t i = 0; i < projectiles_count; ++i) {
+    projectiles[i].active_animat = active_animat;
+    projectiles[i].poof_animat = poof_animat;
+  }
+}
+
+// * Finds the first Ded projectile and spwans that
+void spwan_projectile(Vec2i pos, Vec2i vel, SDL_RendererFlip dir) {
+  for(size_t i = 0; i < projectiles_count; ++i) {
+    if(projectiles[i].state == Projectile_State::Ded) {
+      projectiles[i].state = Projectile_State::Active;
+      projectiles[i].pos = pos;
+      projectiles[i].vel = vel;
+      projectiles[i].dir = dir;
+      return;
+    }
+  } 
+}
+
+// * Renders all the active projectiles
+void render_projectiles(SDL_Renderer *renderer) {
+  const int PROJ_SIZE = 50;
+  const int PROJ_SIZE_HALF = PROJ_SIZE / 2;
+  for(size_t i = 0; i < projectiles_count; ++i) {
+    switch (projectiles[i].state)
+    {
+      case Projectile_State::Active: { // * active animation
+        const SDL_Rect dstrect = {
+            projectiles[i].pos.x - PROJ_SIZE_HALF,
+            projectiles[i].pos.y - PROJ_SIZE_HALF,
+            PROJ_SIZE, PROJ_SIZE};
+        render_animat(renderer,
+                      projectiles[i].active_animat,
+                      dstrect, projectiles[i].dir);
+      } break;
+      case Projectile_State::Poof: { // * poof animation
+        const SDL_Rect dstrect = {
+          projectiles[i].pos.x - PROJ_SIZE_HALF,
+          projectiles[i].pos.y - PROJ_SIZE_HALF,
+          PROJ_SIZE, PROJ_SIZE};
+        render_animat(renderer,
+                      projectiles[i].poof_animat,
+                      dstrect);
+      } break;
+      case Projectile_State::Ded:
+        break;
+      default:
+        break;
+    }
+  } 
+}
+
+void update_projectiles(Uint64 dt) {
+  for(size_t i = 0; i < projectiles_count; ++i) {
+    switch (projectiles[i].state)
+    {
+    case Projectile_State::Active: { // * update active animation
+      update_animat(&projectiles[i].active_animat, dt);
+
+      // * Update the projectile position
+      if(projectiles[i].state != Projectile_State::Ded) {
+        projectiles[i].pos += projectiles[i].vel;
+      }
+
+      // * If projectile hit the tile then switch to poof animation
+      if(!is_tile_empty(projectiles[i].pos / TILE_SIZE) || !is_tile_inbounds(projectiles[i].pos / TILE_SIZE)) {
+        projectiles[i].state = Projectile_State::Poof; 
+        projectiles[i].poof_animat.frame_current = 0;
+      }
+    } break;
+    case Projectile_State::Poof: { // * poof animation
+      update_animat(&projectiles[i].poof_animat, dt);
+      if(projectiles[i].poof_animat.frame_current == projectiles[i].poof_animat.frames_count - 1) {
+        projectiles[i].state = Projectile_State::Ded;  
+      }
+    } break;
+    default:
+      break;
+    }
+
+  }  
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -446,36 +584,39 @@ int main(void) {
       .texture = tileset_texture};
 
   // * Player Texture
-  SDL_Texture *walking_texture =
-      load_texture_from_png(renderer, WALKING_FILEPATH);
-  const int walking_frame_count = 4;
-  Sprite walking_frames[walking_frame_count];
-  for (int i = 0; i < walking_frame_count; ++i) {
-    walking_frames[i].rect = {
-        .x = i * PLAYER_TEXBOX_SIZE,
-        .y = 0,
-        .w = PLAYER_TEXBOX_SIZE,
-        .h = PLAYER_TEXBOX_SIZE};
-    walking_frames[i].texture = walking_texture;
-  }
+  const int walking_frame_count = 4, walking_frame_duration = 100;
+  Animat walking = load_spritesheet_animat(renderer, walking_frame_count, walking_frame_duration, WALKING_FILEPATH);
+  // SDL_Texture *walking_texture =
+  //     load_texture_from_png(renderer, WALKING_FILEPATH);
+  // Sprite walking_frames[walking_frame_count];
+  // for (int i = 0; i < walking_frame_count; ++i) {
+  //   walking_frames[i].rect = {
+  //       .x = i * PLAYER_TEXBOX_SIZE,
+  //       .y = 0,
+  //       .w = PLAYER_TEXBOX_SIZE,
+  //       .h = PLAYER_TEXBOX_SIZE};
+  //   walking_frames[i].texture = walking_texture;
+  // }
+
+  // * Projectile Texture
 
   // * Define Player
   Player player = {
       .texbox = {
           -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE},
       .hitbox = {-(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE}};
-
+  player.walking = walking;
   // * Player Animation
-  player.walking = {
-      .frames = walking_frames,
-      .frames_count = 4,
-      .frame_current = 0,
-      .frame_duration = 100,
-      .frame_cooldown = 100};
+  // player.walking = {
+  //     .frames = walking_frames,
+  //     .frames_count = 4,
+  //     .frame_current = 0,
+  //     .frame_duration = 100,
+  //     .frame_cooldown = 100};
  
   // * Player Idle Animation
   player.idle = {
-      .frames = walking_frames + 2, // * 3rd frame
+      .frames = player.walking.frames + 2, // * 3rd frame
       .frames_count = 1,
       .frame_current = 0,
       .frame_duration = 100,
@@ -485,17 +626,23 @@ int main(void) {
   player.current = &player.idle;
   player.dir = SDL_FLIP_NONE;
       
-  int ddy = 1;
-  bool quit = false, debug = false;
-  const Uint8* keyboard = SDL_GetKeyboardState(NULL);
+
+  // * Initialize the projectiles animats
+  Animat plasma_pop_animat = load_spritesheet_animat(renderer, 5, 200, PROJECTILE_SPARK_FILEPATH);
+  Animat plasma_poof_animat = load_spritesheet_animat(renderer, 4, 200, PROJECTILE_DESTORY_FILEPATH);
+  init_projectiles(plasma_pop_animat, plasma_poof_animat);
 
   const SDL_Rect level_boundary = {0, 0, LEVEL_WIDTH * TILE_SIZE, LEVEL_HEIGHT * TILE_SIZE};
   const int COLLISION_PROBE_SIZE = 10;
-  SDL_Rect collision_probe = {}, tile_rect = {};
   Vec2i mouse_position = {};
+  SDL_Rect collision_probe = {}, tile_rect = {};
   Debug_Draw_State state = Debug_Draw_State::Idle;
-
+  
+  int ddy = 1;
   uint64_t fps = 0;
+  bool quit = false, debug = false;
+  const Uint8* keyboard = SDL_GetKeyboardState(NULL);
+
   while (!quit) {
     const Uint64 begin = SDL_GetTicks64();
 
@@ -512,6 +659,13 @@ int main(void) {
           } break;
           case SDLK_l: {
             quit = true;
+          } break;
+          case SDLK_e: {
+            if(player.dir == SDL_FLIP_NONE) {
+              spwan_projectile(player.pos, vec2(4, 0), player.dir);
+            } else {
+              spwan_projectile(player.pos, vec2(-4, 0), player.dir);
+            }
           } break;
           case SDLK_q: {
             debug = !debug;
@@ -606,7 +760,8 @@ int main(void) {
     sec(SDL_RenderClear(renderer));
     render_level(renderer, ground_grass_texture, ground_texture);
     render_player(renderer, player);
-    
+    render_projectiles(renderer);
+
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
@@ -644,6 +799,7 @@ int main(void) {
     const Uint64 dt = SDL_GetTicks64() - begin;
 
     update_player(&player, dt);
+    update_projectiles(dt);
   }
 
   SDL_Quit();
