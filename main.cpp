@@ -92,6 +92,7 @@ bool is_tile_empty(Vec2i p) {
   return !is_tile_inbounds(p) || level[p.y][p.x] == Tile::Empty;
 }
 
+// * Render sprite with sprite dest rect
 void render_sprite(SDL_Renderer *renderer,
                    Sprite texture,
                    SDL_Rect dstrect,
@@ -102,6 +103,24 @@ void render_sprite(SDL_Renderer *renderer,
                        &texture.rect, // * srcrect
                        &dstrect,
                        0.0, nullptr,
+                       flip));
+}
+
+// * Render sprite with sprite position vector
+void render_sprite(SDL_Renderer *renderer,
+                   Sprite texture,
+                   Vec2i pos,
+                   SDL_RendererFlip flip = SDL_FLIP_NONE)
+{
+  SDL_Rect dstrect = {
+      pos.x - (texture.rect.w / 2), pos.y - (texture.rect.h / 2),
+      texture.rect.w, texture.rect.h};
+  sec(SDL_RenderCopyEx(renderer,
+                       texture.texture,
+                       &texture.rect, // * srcrect
+                       &dstrect,
+                       0.0,
+                       nullptr,
                        flip));
 }
 
@@ -213,6 +232,17 @@ void render_animat(SDL_Renderer *renderer,
   render_sprite(renderer,
                 animat.frames[animat.frame_current % animat.frames_count],
                 dstrect, flip);
+}
+
+static inline
+void render_animat(SDL_Renderer *renderer,
+                   Animat animat,
+                   Vec2i pos,
+                   SDL_RendererFlip flip = SDL_FLIP_NONE)
+{
+  render_sprite(renderer,
+                animat.frames[animat.frame_current % animat.frames_count],
+                pos, flip);
 }
 
 // * Checks the animation cooldown period before rendering new animation
@@ -492,28 +522,18 @@ void spwan_projectile(Vec2i pos, Vec2i vel, SDL_RendererFlip dir) {
 
 // * Renders all the active projectiles
 void render_projectiles(SDL_Renderer *renderer) {
-  const int PROJ_SIZE = 50;
-  const int PROJ_SIZE_HALF = PROJ_SIZE / 2;
   for(size_t i = 0; i < projectiles_count; ++i) {
     switch (projectiles[i].state)
     {
       case Projectile_State::Active: { // * active animation
-        const SDL_Rect dstrect = {
-            projectiles[i].pos.x - PROJ_SIZE_HALF,
-            projectiles[i].pos.y - PROJ_SIZE_HALF,
-            PROJ_SIZE, PROJ_SIZE};
         render_animat(renderer,
                       projectiles[i].active_animat,
-                      dstrect, projectiles[i].dir);
+                      projectiles[i].pos, projectiles[i].dir);
       } break;
-      case Projectile_State::Poof: { // * poof animation
-        const SDL_Rect dstrect = {
-          projectiles[i].pos.x - PROJ_SIZE_HALF,
-          projectiles[i].pos.y - PROJ_SIZE_HALF,
-          PROJ_SIZE, PROJ_SIZE};
+      case Projectile_State::Poof: { // * poof animation;
         render_animat(renderer,
                       projectiles[i].poof_animat,
-                      dstrect);
+                      projectiles[i].pos, projectiles[i].dir);
       } break;
       case Projectile_State::Ded:
         break;
