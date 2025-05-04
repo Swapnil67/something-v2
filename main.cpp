@@ -223,6 +223,7 @@ struct Animat {
   uint64_t frame_cooldown;
 };
 
+// * Animat position as SDL_Rect
 static inline
 void render_animat(SDL_Renderer *renderer,
                    Animat animat,
@@ -234,6 +235,7 @@ void render_animat(SDL_Renderer *renderer,
                 dstrect, flip);
 }
 
+// * Animat position as Vec2i
 static inline
 void render_animat(SDL_Renderer *renderer,
                    Animat animat,
