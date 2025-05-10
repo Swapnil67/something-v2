@@ -263,7 +263,7 @@ enum class Entity_Dir {
   Left
 };
 
-struct Player {
+struct Entity {
   Vec2i pos;
   Vec2i vel;
   SDL_Rect texbox;
@@ -346,11 +346,11 @@ void resolve_point_collision(Vec2i *p) {
   *p = sides[closest_side].np;
 }
 
-void resolve_player_collision(Player *player) {
-  assert(player);
+void resolve_entity_collision(Entity *entity) {
+  assert(entity);
 
-  Vec2i p0 = vec2(player->hitbox.x, player->hitbox.y) + player->pos;
-  Vec2i p1 = p0 + vec2(player->hitbox.w, player->hitbox.h);
+  Vec2i p0 = vec2(entity->hitbox.x, entity->hitbox.y) + entity->pos;
+  Vec2i p1 = p0 + vec2(entity->hitbox.w, entity->hitbox.h);
 
   Vec2i mesh[] = {
      p0,
@@ -369,17 +369,17 @@ void resolve_player_collision(Player *player) {
 
     // printf("dx: %d, dy: %d\n", d.x, d.y);
     if (std::abs(d.y) >= IMPACT_THRESHOLD) {
-      player->vel.y = 0;
+      entity->vel.y = 0;
     }
 
     if (std::abs(d.x) >= IMPACT_THRESHOLD) {
-      player->vel.x = 0;
+      entity->vel.x = 0;
     }
 
     for(int j = 0;  j < MESH_COUNT; ++j) {
       mesh[j] += d;
     }
-    player->pos += d;
+    entity->pos += d;
   }
 }
 
@@ -394,27 +394,27 @@ SDL_Texture *render_text_as_texture(TTF_Font *font,
   return text_texture;
 }
 
-SDL_Rect get_player_texbox(const Player player) {
+SDL_Rect get_entity_dstrect(const Entity entity) {
   SDL_Rect dstrect = {
-      player.texbox.x + player.pos.x, player.texbox.y + player.pos.y,
-      player.texbox.w, player.texbox.h};
+      entity.texbox.x + entity.pos.x, entity.texbox.y + entity.pos.y,
+      entity.texbox.w, entity.texbox.h};
   return dstrect;
 }
 
-SDL_Rect get_player_hitbox(const Player player) {
+SDL_Rect get_entity_htibox(const Entity entity) {
   SDL_Rect hitbox = {
-      player.hitbox.x + player.pos.x, player.hitbox.y + player.pos.y,
-      player.hitbox.w, player.hitbox.h};
+      entity.hitbox.x + entity.pos.x, entity.hitbox.y + entity.pos.y,
+      entity.hitbox.w, entity.hitbox.h};
   return hitbox;
 }
 
-void render_player(SDL_Renderer *renderer, const Player player) {
-  const SDL_Rect player_dstrect = get_player_texbox(player);
-  const SDL_RendererFlip flip = player.dir == Entity_Dir::Right ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL;
-  render_animat(renderer, *player.current, player_dstrect, flip);
+void render_entity(SDL_Renderer *renderer, const Entity entity) {
+  const SDL_Rect entity_dstrect = get_entity_dstrect(entity);
+  const SDL_RendererFlip flip = entity.dir == Entity_Dir::Right ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL;
+  render_animat(renderer, *entity.current, entity_dstrect, flip);
 }
 
-void update_player(Player *player, Uint64 dt) {
+void update_entity(Entity *player, Uint64 dt) {
   update_animat(&player->walking, dt);
 }
 
@@ -615,34 +615,14 @@ int main(void) {
   // * Player Texture
   const int walking_frame_count = 4, walking_frame_duration = 100;
   Animat walking = load_spritesheet_animat(renderer, walking_frame_count, walking_frame_duration, WALKING_FILEPATH);
-  // SDL_Texture *walking_texture =
-  //     load_texture_from_png(renderer, WALKING_FILEPATH);
-  // Sprite walking_frames[walking_frame_count];
-  // for (int i = 0; i < walking_frame_count; ++i) {
-  //   walking_frames[i].rect = {
-  //       .x = i * PLAYER_TEXBOX_SIZE,
-  //       .y = 0,
-  //       .w = PLAYER_TEXBOX_SIZE,
-  //       .h = PLAYER_TEXBOX_SIZE};
-  //   walking_frames[i].texture = walking_texture;
-  // }
-
-  // * Projectile Texture
 
   // * Define Player
-  Player player = {
+  Entity player = {
       .texbox = {
           -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE},
       .hitbox = {-(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE}};
   player.walking = walking;
-  // * Player Animation
-  // player.walking = {
-  //     .frames = walking_frames,
-  //     .frames_count = 4,
-  //     .frame_current = 0,
-  //     .frame_duration = 100,
-  //     .frame_cooldown = 100};
- 
+
   // * Player Idle Animation
   player.idle = {
       .frames = player.walking.frames + 2, // * 3rd frame
@@ -777,21 +757,21 @@ int main(void) {
     player.pos += player.vel;
 
     // * Resolve player collision
-    resolve_player_collision(&player);
+    resolve_entity_collision(&player);
 
     // * Render state
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
     render_level(renderer, ground_grass_texture, ground_texture);
-    render_player(renderer, player);
+    render_entity(renderer, player);
     render_projectiles(renderer);
 
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
       
-      SDL_Rect player_dstrect = get_player_texbox(player);
-      sec(SDL_RenderDrawRect(renderer, &player_dstrect));
+      SDL_Rect entity_dstrect = get_entity_dstrect(player);
+      sec(SDL_RenderDrawRect(renderer, &entity_dstrect));
 
       sec(SDL_RenderFillRect(renderer, &collision_probe));
       sec(SDL_RenderDrawRect(renderer, &tile_rect));
@@ -814,15 +794,15 @@ int main(void) {
                "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
 
       sec(SDL_SetRenderDrawColor(renderer, COLOR_YELLOW));
-      SDL_Rect player_hitbox = get_player_hitbox(player);
-      sec(SDL_RenderDrawRect(renderer, &player_hitbox));
+      SDL_Rect hitbox = get_entity_htibox(player);
+      sec(SDL_RenderDrawRect(renderer, &hitbox));
     }
 
 
     SDL_RenderPresent(renderer);
     const Uint64 dt = SDL_GetTicks64() - begin;
 
-    update_player(&player, dt);
+    update_entity(&player, dt);
     update_projectiles(dt);
   }
 
