@@ -70,12 +70,17 @@ enum class Tile
 
 const int LEVEL_WIDTH = 10;
 const int LEVEL_HEIGHT = 10;
-Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
-    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
-    {Tile::Empty, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall},
-    {Tile::Wall, Tile::Wall, Tile::Wall, Tile::Empty, Tile::Empty},
+Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] ={
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, },
+{Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
 };
 
 struct Sprite {
@@ -583,6 +588,31 @@ void update_projectiles(Uint64 dt) {
   }  
 }
 
+void dump_level() {
+  std::printf("{\n");
+  for (int y = 0; y < LEVEL_HEIGHT; ++y) {
+    std::printf("{");
+    for (int x = 0; x < LEVEL_WIDTH; ++x) {
+      switch (level[y][x])
+      {
+
+      case Tile::Empty: {
+        std::printf("Tile::Empty, ");
+      } break;
+
+      case Tile::Wall: {
+        std::printf("Tile::Wall, ");
+      } break;
+      default:
+        break;
+      }
+    }
+    std::printf("},\n");
+    std::printf("\n");
+  }
+  std::printf("}\n");
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -616,23 +646,37 @@ int main(void) {
   const int walking_frame_count = 4, walking_frame_duration = 100;
   Animat walking = load_spritesheet_animat(renderer, walking_frame_count, walking_frame_duration, WALKING_FILEPATH);
 
-  // * Define Player
-  Entity player = {
-      .texbox = {
-          -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE},
-      .hitbox = {-(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE}};
-  player.walking = walking;
+  SDL_Rect texbox = {
+      -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE};
+
+  SDL_Rect hitbox = {
+      -(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE};
 
   // * Player Idle Animation
-  player.idle = {
-      .frames = player.walking.frames + 2, // * 3rd frame
+  Animat idle = {
+      .frames = walking.frames + 2, // * 3rd frame
       .frames_count = 1,
       .frame_current = 0,
       .frame_duration = 100,
       .frame_cooldown = 0};
 
-  // * Current player animation
-  player.current = &player.idle;
+  // * Define Player
+  Entity player = { 
+    .texbox = texbox, 
+    .hitbox = hitbox,
+    .walking = walking,
+    .idle = idle,
+    .current = &player.idle
+ };
+
+  // * Define Enemy
+  Entity supposed_enemy = { 
+    .texbox = texbox, 
+    .hitbox = hitbox,
+    .walking = walking,
+    .idle = idle,
+    .current = &supposed_enemy.idle
+ };
 
   // * Initialize the projectiles animats
   Animat plasma_pop_animat = load_spritesheet_animat(renderer, 5, 200, PROJECTILE_SPARK_FILEPATH);
@@ -807,5 +851,6 @@ int main(void) {
   }
 
   SDL_Quit();
+  dump_level();
   return 0;
 }
