@@ -70,18 +70,17 @@ enum class Tile
 
 const int LEVEL_WIDTH = 10;
 const int LEVEL_HEIGHT = 10;
-Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] ={
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, },
-{Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-{Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
-};
+Tile level[LEVEL_HEIGHT][LEVEL_WIDTH] = {
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, Tile::Wall,  Tile::Empty, },
+  {Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall,  Tile::Wall, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, },
+  {Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, Tile::Empty, }};
 
 struct Sprite {
   SDL_Rect rect;
@@ -419,8 +418,15 @@ void render_entity(SDL_Renderer *renderer, const Entity entity) {
   render_animat(renderer, *entity.current, entity_dstrect, flip);
 }
 
-void update_entity(Entity *player, Uint64 dt) {
-  update_animat(&player->walking, dt);
+void update_entity(Entity *entity, Vec2i gravity, Uint64 dt) {
+  // * Add gravity to player velocity
+  entity->vel += gravity;
+  entity->pos += entity->vel;
+
+  // * Resolve entity collision
+  resolve_entity_collision(entity);
+
+  update_animat(&entity->walking, dt);
 }
 
 void render_texture(SDL_Texture *texture, SDL_Renderer *renderer, Vec2i pos) {
@@ -677,6 +683,7 @@ int main(void) {
     .idle = idle,
     .current = &supposed_enemy.idle
  };
+ supposed_enemy.pos = vec2(100, 0);
 
   // * Initialize the projectiles animats
   Animat plasma_pop_animat = load_spritesheet_animat(renderer, 5, 200, PROJECTILE_SPARK_FILEPATH);
@@ -689,7 +696,7 @@ int main(void) {
   SDL_Rect collision_probe = {}, tile_rect = {};
   Debug_Draw_State state = Debug_Draw_State::Idle;
   
-  int ddy = 1;
+  const Vec2i gravity = vec2(0, 1);
   uint64_t fps = 0;
   bool quit = false, debug = false;
   const Uint8* keyboard = SDL_GetKeyboardState(NULL);
@@ -796,18 +803,12 @@ int main(void) {
       player.vel.x = 0;
     }
 
-    // * Add gravity to player 'y' velocity
-    player.vel.y += ddy;
-    player.pos += player.vel;
-
-    // * Resolve player collision
-    resolve_entity_collision(&player);
-
     // * Render state
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
     render_level(renderer, ground_grass_texture, ground_texture);
     render_entity(renderer, player);
+    render_entity(renderer, supposed_enemy);
     render_projectiles(renderer);
 
     // * Show player hitbox
@@ -846,11 +847,13 @@ int main(void) {
     SDL_RenderPresent(renderer);
     const Uint64 dt = SDL_GetTicks64() - begin;
 
-    update_entity(&player, dt);
+
+    update_entity(&player, gravity, dt);
+    update_entity(&supposed_enemy, gravity, dt);
     update_projectiles(dt);
   }
 
   SDL_Quit();
-  dump_level();
+  // dump_level();
   return 0;
 }
