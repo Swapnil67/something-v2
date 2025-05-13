@@ -619,6 +619,27 @@ void dump_level() {
   std::printf("}\n");
 }
 
+void entity_move(Entity *entity, int speed) {
+  assert(entity);
+  entity->vel.x = speed;
+
+  // * Move entity in right direction
+  if(speed > 0) {
+    entity->dir = Entity_Dir::Right;
+  } else if(speed < 0) {
+    // * Move entity in left direction
+    entity->dir = Entity_Dir::Left;
+  }
+
+  entity->current = &entity->walking;
+}
+
+void entitiy_stop(Entity *entity) {
+  assert(entity);
+  entity->vel.x = 0;
+  entity->current = &entity->idle;
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -791,16 +812,11 @@ int main(void) {
 
     // * Update state
     if (keyboard[SDL_SCANCODE_D]) {
-      player.vel.x = PLAYER_SPEED;
-      player.current = &player.walking;
-      player.dir = Entity_Dir::Right;
+      entity_move(&player, PLAYER_SPEED);
     } else if (keyboard[SDL_SCANCODE_A]) {
-      player.vel.x = -PLAYER_SPEED;
-      player.current = &player.walking;
-      player.dir = Entity_Dir::Left;
+      entity_move(&player, -PLAYER_SPEED);
     } else {
-      player.current = &player.idle;
-      player.vel.x = 0;
+      entitiy_stop(&player);
     }
 
     // * Render state
