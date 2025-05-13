@@ -270,11 +270,17 @@ enum class Entity_Dir {
   Left
 };
 
+enum class Entity_State {
+  Ded = 0,
+  Alive
+};
+
 struct Entity {
-  Vec2i pos;
-  Vec2i vel;
+
   SDL_Rect texbox;
   SDL_Rect hitbox;
+  Vec2i pos;
+  Vec2i vel;
 
   Animat idle;
   Animat walking;
@@ -284,6 +290,9 @@ struct Entity {
 
   int weapon_cooldown;
 };
+
+const int entity_count = 69;
+Entity entities[entity_count];
 
 static inline
 int get_sqr_dist(Vec2i p0, Vec2i p1) {
