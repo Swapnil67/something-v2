@@ -634,10 +634,20 @@ void entity_move(Entity *entity, int speed) {
   entity->current = &entity->walking;
 }
 
-void entitiy_stop(Entity *entity) {
+void entity_stop(Entity *entity) {
   assert(entity);
   entity->vel.x = 0;
   entity->current = &entity->idle;
+}
+
+// * shoots the projectile
+void entity_shoot(Entity *entity) {
+  assert(entity);
+  if (entity->dir == Entity_Dir::Right) {
+    spwan_projectile(entity->pos, vec2(4, 0), entity->dir);
+  } else {
+    spwan_projectile(entity->pos, vec2(-4, 0), entity->dir);
+  }
 }
 
 int main(void) {
@@ -740,11 +750,7 @@ int main(void) {
             quit = true;
           } break;
           case SDLK_e: {
-            if(player.dir == Entity_Dir::Right) {
-              spwan_projectile(player.pos, vec2(4, 0), player.dir);
-            } else {
-              spwan_projectile(player.pos, vec2(-4, 0), player.dir);
-            }
+            entity_shoot(&player);
           } break;
           case SDLK_q: {
             debug = !debug;
@@ -810,13 +816,15 @@ int main(void) {
       }
     }
 
+    entity_shoot(&supposed_enemy);
+
     // * Update state
     if (keyboard[SDL_SCANCODE_D]) {
       entity_move(&player, PLAYER_SPEED);
     } else if (keyboard[SDL_SCANCODE_A]) {
       entity_move(&player, -PLAYER_SPEED);
     } else {
-      entitiy_stop(&player);
+      entity_stop(&player);
     }
 
     // * Render state
