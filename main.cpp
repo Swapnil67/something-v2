@@ -25,6 +25,9 @@ const int PLAYER_SPEED = 2;
 const int PLAYER_TEXBOX_SIZE = 48;
 const int PLAYER_HITBOX_SIZE = (PLAYER_TEXBOX_SIZE - 10);
 
+const int ENTITY_WEAPON_COOLDOWN = 30;
+
+
 template <typename T>
 T *stec(T *ptr) {
   if(ptr == nullptr) {
@@ -278,6 +281,8 @@ struct Entity {
   Animat *current;
 
   Entity_Dir dir;
+
+  int weapon_cooldown;
 };
 
 static inline
@@ -425,6 +430,9 @@ void update_entity(Entity *entity, Vec2i gravity, Uint64 dt) {
 
   // * Resolve entity collision
   resolve_entity_collision(entity);
+
+  // * Update weapon cooldown
+  entity->weapon_cooldown -= 1;
 
   update_animat(&entity->walking, dt);
 }
@@ -643,11 +651,17 @@ void entity_stop(Entity *entity) {
 // * shoots the projectile
 void entity_shoot(Entity *entity) {
   assert(entity);
+
+  if (entity->weapon_cooldown > 0)
+    return;
+
   if (entity->dir == Entity_Dir::Right) {
     spwan_projectile(entity->pos, vec2(4, 0), entity->dir);
   } else {
     spwan_projectile(entity->pos, vec2(-4, 0), entity->dir);
   }
+
+  entity->weapon_cooldown = ENTITY_WEAPON_COOLDOWN;
 }
 
 int main(void) {
