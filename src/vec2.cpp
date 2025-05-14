@@ -39,6 +39,12 @@ Vec2<T> operator/(Vec2<T> a, Vec2<T> b) {
   return {a.x / b.x, a.y / b.y};
 }
 
+static inline
+int get_sqr_dist(Vec2i p0, Vec2i p1) {
+  auto d = p0 - p1;
+  return d.x * d.x + d.y * d.y;
+}
+
 template <typename T>
 Vec2<T> &operator+=(Vec2<T> &a, Vec2<T> b) { a = a + b; return a; }
 
