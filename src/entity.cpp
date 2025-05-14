@@ -150,6 +150,8 @@ void update_entity(Entity *entity, Vec2i gravity, Uint64 dt) {
   // * Resolve entity collision
   resolve_entity_collision(entity);
 
+  entity->weapon_cooldown -= 1;
+
   update_animat(&entity->walking, dt);
 }
 
