@@ -78,6 +78,8 @@ void render_animat(SDL_Renderer *renderer,
 
 // * Checks the animation cooldown period before rendering new animation
 void update_animat(Animat *animat, Uint64 dt) {
+  assert(animat);
+  
   if (dt < animat->frame_cooldown) {
     animat->frame_cooldown -= dt;
   }

@@ -113,23 +113,28 @@ int main(void) {
       .frame_cooldown = 0};
 
   // * Define Player
-  Entity player = { 
-    .texbox = texbox, 
-    .hitbox = hitbox,
-    .walking = walking,
-    .idle = idle,
-    .current = &player.idle
- };
+  int PLAYER_ENTITY_INDEX = 0;
 
+  entities[PLAYER_ENTITY_INDEX] = { 
+    .texbox = texbox, 
+    .state = Entity_State::Alive,
+    .hitbox = hitbox,
+    .walking = walking,
+    .idle = idle,
+    .current = &entities[PLAYER_ENTITY_INDEX].idle
+  };
+  
   // * Define Enemy
-  Entity supposed_enemy = { 
+  int ENEMY_ENTITY_INDEX = 1;
+  entities[ENEMY_ENTITY_INDEX] = { 
+    .state = Entity_State::Alive,
     .texbox = texbox, 
     .hitbox = hitbox,
     .walking = walking,
     .idle = idle,
-    .current = &supposed_enemy.idle
+    .current = &entities[ENEMY_ENTITY_INDEX].idle
  };
- supposed_enemy.pos = vec2(100, 0);
+ entities[ENEMY_ENTITY_INDEX].pos = vec2(100, 0);
 
   // * Initialize the projectiles animats
   Animat plasma_pop_animat = load_spritesheet_animat(renderer, 5, 200, PROJECTILE_SPARK_FILEPATH);
@@ -158,20 +163,20 @@ int main(void) {
         case SDL_KEYDOWN: {
           switch (event.key.keysym.sym) {
           case SDLK_SPACE: {
-            player.vel.y = -20;
+            entities[PLAYER_ENTITY_INDEX].vel.y = -20;
           } break;
           case SDLK_l: {
             quit = true;
           } break;
           case SDLK_e: {
-            entity_shoot(&player);
+            entity_shoot(&entities[PLAYER_ENTITY_INDEX]);
           } break;
           case SDLK_q: {
             debug = !debug;
           } break;
           case SDLK_r: {
-            player.vel.y = 0;
-            player.pos = vec2(0, 0);
+            entities[PLAYER_ENTITY_INDEX].vel.y = 0;
+            entities[PLAYER_ENTITY_INDEX].pos = vec2(0, 0);
           } break;
 
           default:
@@ -230,30 +235,29 @@ int main(void) {
       }
     }
 
-    entity_shoot(&supposed_enemy);
+    entity_shoot(&entities[ENEMY_ENTITY_INDEX]);
 
     // * Update state
     if (keyboard[SDL_SCANCODE_D]) {
-      entity_move(&player, PLAYER_SPEED);
+      entity_move(&entities[PLAYER_ENTITY_INDEX], PLAYER_SPEED);
     } else if (keyboard[SDL_SCANCODE_A]) {
-      entity_move(&player, -PLAYER_SPEED);
+      entity_move(&entities[PLAYER_ENTITY_INDEX], -PLAYER_SPEED);
     } else {
-      entity_stop(&player);
+      entity_stop(&entities[PLAYER_ENTITY_INDEX]);
     }
 
     // * Render state
     sec(SDL_SetRenderDrawColor(renderer, COLOR_BLACK));
     sec(SDL_RenderClear(renderer));
     render_level(renderer, ground_grass_texture, ground_texture);
-    render_entity(renderer, player);
-    render_entity(renderer, supposed_enemy);
+    render_entities(renderer);
     render_projectiles(renderer);
 
     // * Show player hitbox
     if(debug) {
       sec(SDL_SetRenderDrawColor(renderer, COLOR_RED));
       
-      SDL_Rect entity_dstrect = get_entity_dstrect(player);
+      SDL_Rect entity_dstrect = get_entity_dstrect(entities[PLAYER_ENTITY_INDEX]);
       sec(SDL_RenderDrawRect(renderer, &entity_dstrect));
 
       sec(SDL_RenderFillRect(renderer, &collision_probe));
@@ -277,7 +281,7 @@ int main(void) {
                "Collision Probe: (%d %d)", collision_probe.x, collision_probe.y);
 
       sec(SDL_SetRenderDrawColor(renderer, COLOR_YELLOW));
-      SDL_Rect hitbox = get_entity_htibox(player);
+      SDL_Rect hitbox = get_entity_htibox(entities[PLAYER_ENTITY_INDEX]);
       sec(SDL_RenderDrawRect(renderer, &hitbox));
     }
 
@@ -286,8 +290,7 @@ int main(void) {
     const Uint64 dt = SDL_GetTicks64() - begin;
 
 
-    update_entity(&player, gravity, dt);
-    update_entity(&supposed_enemy, gravity, dt);
+    udpate_entities(gravity, dt);
     update_projectiles(dt);
   }
 

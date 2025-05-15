@@ -10,6 +10,8 @@ enum class Entity_State {
 
 struct Entity {
 
+  Entity_State state;
+
   SDL_Rect texbox;
   SDL_Rect hitbox;
   Vec2i pos;
@@ -24,10 +26,6 @@ struct Entity {
   int weapon_cooldown;
 };
 
-
-const int entity_count = 69;
-Entity entities[entity_count];
-
 SDL_Rect get_entity_dstrect(const Entity entity) {
   SDL_Rect dstrect = {
       entity.texbox.x + entity.pos.x, entity.texbox.y + entity.pos.y,
@@ -36,10 +34,14 @@ SDL_Rect get_entity_dstrect(const Entity entity) {
 }
 
 void render_entity(SDL_Renderer *renderer, const Entity entity) {
+  assert(renderer);
+  if (entity.state == Entity_State::Ded)
+    return;
   const SDL_Rect entity_dstrect = get_entity_dstrect(entity);
   const SDL_RendererFlip flip = entity.dir == Entity_Dir::Right ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL;
   render_animat(renderer, *entity.current, entity_dstrect, flip);
 }
+
 
 void resolve_point_collision(Vec2i *p) {
   assert(p);
@@ -143,6 +145,11 @@ void resolve_entity_collision(Entity *entity) {
 }
 
 void update_entity(Entity *entity, Vec2i gravity, Uint64 dt) {
+  assert(entity);
+
+  if (entity->state == Entity_State::Ded)
+    return;
+
   // * Add gravity to player velocity
   entity->vel += gravity;
   entity->pos += entity->vel;
@@ -204,3 +211,23 @@ void entity_shoot(Entity *entity) {
 
   entity->weapon_cooldown = ENTITY_WEAPON_COOLDOWN;
 }
+
+const int entities_count = 69;
+Entity entities[entities_count];
+
+// * Update the list of entities
+void udpate_entities(Vec2i gravity, Uint64 dt) {
+  for(int i = 0; i < entities_count; ++i) {
+    update_entity(&entities[i], gravity, dt);
+  }
+}
+
+// * Render the list of entities
+void render_entities(SDL_Renderer *renderer) {
+  for(int i = 0; i < entities_count; ++i) {
+    if (entities[i].state == Entity_State::Ded)
+      continue;
+    render_entity(renderer, entities[i]);
+  }
+}
+
