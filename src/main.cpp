@@ -65,6 +65,24 @@ enum class Debug_Draw_State {
   Delete
 };
 
+void enemy_spritesheet(SDL_Surface *surface) {
+  assert(surface);
+  assert(surface->format);
+  assert(surface->format->BytesPerPixel == 4);
+
+  SDL_LockSurface(surface);
+  
+  for (int y = 0; y < surface->h; ++y) {
+    for (int x = 0; x < surface->w; ++x) {
+      int pixel_idx = y * surface->pitch + x * surface->format->BytesPerPixel;
+      Uint8 *pixels = (Uint8 *)surface->pixels;
+      *(Uint32 *)(pixels + pixel_idx) |= 0x00000FFF;
+    }
+  }
+
+  SDL_UnlockSurface(surface);
+}
+
 int main(void) {
   sec(SDL_Init(SDL_INIT_VIDEO));
 
@@ -96,31 +114,91 @@ int main(void) {
 
   // * Player Texture
   const int walking_frame_count = 4, walking_frame_duration = 100;
-  Animat walking = load_spritesheet_animat(renderer, walking_frame_count, walking_frame_duration, WALKING_FILEPATH);
+  // Animat walking = load_spritesheet_animat(renderer, walking_frame_count, walking_frame_duration, WALKING_FILEPATH);
+  
+  // * Player Walking Animation
+  Sprite player_walking_frames[walking_frame_count];
+  Animat player_walking_animation = {
+    .frames = player_walking_frames,
+    .frames_count = walking_frame_count,
+    .frame_duration = walking_frame_duration
+  };
+  
+  Sprite enemy_walking_frames[walking_frame_count];
+  // * Enemy Walking Animation
+  Animat enemy_walking_animation = {
+    .frames = enemy_walking_frames,
+    .frames_count = walking_frame_count,
+    .frame_duration = walking_frame_duration
+  };
 
+  // * Player Idle Animation
+  Animat player_idle = {
+    .frames = player_walking_animation.frames + 2, // * 3rd frame
+    .frames_count = 1,
+    .frame_current = 0,
+    .frame_duration = 100,
+    .frame_cooldown = 0};
+
+  // * Ememy Idle Animation
+  Animat enemy_idle = {
+    .frames = enemy_walking_animation.frames + 2, // * 3rd frame
+    .frames_count = 1,
+    .frame_current = 0,
+    .frame_duration = 100,
+    .frame_cooldown = 0};
+
+  // * Create Player Walking Texture
+  SDL_Surface *player_walking_surface = load_png_file_as_surface(WALKING_FILEPATH);
+  SDL_Texture *player_walking_texture = sec(SDL_CreateTextureFromSurface(renderer, player_walking_surface));
+  SDL_FreeSurface(player_walking_surface); // * free the SDL_Surface
+  
+  // * Create Enemy Walking Texture
+  SDL_Surface *enemy_walking_surface = load_png_file_as_surface(WALKING_FILEPATH);
+  enemy_spritesheet(enemy_walking_surface);
+  SDL_Texture *enemy_walking_texture = sec(SDL_CreateTextureFromSurface(renderer, enemy_walking_surface));
+  SDL_FreeSurface(enemy_walking_surface); // * free the SDL_Surface
+
+  // * Get the texture width & height
+  int spritesheet_w = 0, spritesheet_h = 0;
+  SDL_QueryTexture(player_walking_texture, nullptr, nullptr, &spritesheet_w, &spritesheet_h);
+  
+  // * Create Sprites from the texture information
+  int sprit_w = spritesheet_w / (int) walking_frame_count;
+  int sprit_h = spritesheet_h; // * We only handle horizontal sprites
+
+  for(int i = 0; i < (int)walking_frame_count; ++i) {
+    player_walking_animation.frames[i].rect = {
+      .x = i * sprit_w,
+      .y = 0,
+      .w = sprit_w,
+      .h = sprit_h};
+    player_walking_animation.frames[i].texture = player_walking_texture;
+  }
+
+  for(int i = 0; i < (int)walking_frame_count; ++i) {
+    enemy_walking_animation.frames[i].rect = {
+      .x = i * sprit_w,
+      .y = 0,
+      .w = sprit_w,
+      .h = sprit_h};
+    enemy_walking_animation.frames[i].texture = enemy_walking_texture;
+  }
+    
+  // * Define Player
+  int PLAYER_ENTITY_INDEX = 0;
   SDL_Rect texbox = {
       -(PLAYER_TEXBOX_SIZE / 2), -(PLAYER_TEXBOX_SIZE / 2), PLAYER_TEXBOX_SIZE, PLAYER_TEXBOX_SIZE};
 
   SDL_Rect hitbox = {
       -(PLAYER_HITBOX_SIZE / 2), -(PLAYER_HITBOX_SIZE / 2), PLAYER_HITBOX_SIZE - 10, PLAYER_HITBOX_SIZE};
 
-  // * Player Idle Animation
-  Animat idle = {
-      .frames = walking.frames + 2, // * 3rd frame
-      .frames_count = 1,
-      .frame_current = 0,
-      .frame_duration = 100,
-      .frame_cooldown = 0};
-
-  // * Define Player
-  int PLAYER_ENTITY_INDEX = 0;
-
   entities[PLAYER_ENTITY_INDEX] = { 
     .texbox = texbox, 
     .state = Entity_State::Alive,
     .hitbox = hitbox,
-    .walking = walking,
-    .idle = idle,
+    .walking = player_walking_animation,
+    .idle = player_idle,
     .current = &entities[PLAYER_ENTITY_INDEX].idle
   };
   
@@ -130,8 +208,8 @@ int main(void) {
     .state = Entity_State::Alive,
     .texbox = texbox, 
     .hitbox = hitbox,
-    .walking = walking,
-    .idle = idle,
+    .walking = enemy_walking_animation,
+    .idle = enemy_idle,
     .current = &entities[ENEMY_ENTITY_INDEX].idle
  };
  entities[ENEMY_ENTITY_INDEX].pos = vec2(100, 0);

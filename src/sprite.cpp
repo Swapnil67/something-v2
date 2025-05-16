@@ -79,7 +79,7 @@ void render_animat(SDL_Renderer *renderer,
 // * Checks the animation cooldown period before rendering new animation
 void update_animat(Animat *animat, Uint64 dt) {
   assert(animat);
-  
+
   if (dt < animat->frame_cooldown) {
     animat->frame_cooldown -= dt;
   }
@@ -89,9 +89,7 @@ void update_animat(Animat *animat, Uint64 dt) {
   }
 }
 
-// * Creates a SDL_Texture from the png image
-SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
-{
+SDL_Surface *load_png_file_as_surface(const char* filepath) {
   // * Read Image using libpng
   png_image image; /* The control structure used by libpng */
   /* Initialize the 'png_image' structure. */
@@ -103,7 +101,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
     abort();
   }
   image.format = PNG_FORMAT_RGBA;
-
+  
   /* 
   * Now allocate enough memory to hold the image in this format; the
   * PNG_IMAGE_SIZE macro uses the information about the image (width,
@@ -111,7 +109,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
   */
   png_bytep image_pixels;
   image_pixels = (png_bytep)malloc(PNG_IMAGE_SIZE(image));
-
+  
   if (!png_image_finish_read(
           &image,
           nullptr /*background*/,
@@ -122,7 +120,7 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
     fprintf(stderr, "ERROR: libpng: could not finish reading file: `%s`: %s\n", filepath, image.message);
     abort(); 
   }
-
+  
   // * This is a sdl surface from png image
   SDL_Surface *image_surface =
       sec(SDL_CreateRGBSurfaceFrom(image_pixels,
@@ -135,12 +133,21 @@ SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
                                    0x00FF0000,
                                    0xFF000000));
 
+  free(image_pixels);
+  return image_surface;
+}
+
+// * Creates a SDL_Texture from the png image
+SDL_Texture *load_texture_from_png(SDL_Renderer *renderer, const char *filepath)
+{
+  // * Creates a surface from png file
+  SDL_Surface *image_surface = load_png_file_as_surface(filepath);
+
   // * This is a sdl texture from sdl surface
   SDL_Texture *image_texture =
       sec(SDL_CreateTextureFromSurface(renderer, image_surface));
 
-  free(image_pixels);
-  SDL_FreeSurface(image_surface);
+  SDL_FreeSurface(image_surface); // * free the SDL_Surface
   return image_texture;
 }
 
