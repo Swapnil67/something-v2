@@ -65,6 +65,30 @@ enum class Debug_Draw_State {
   Delete
 };
 
+struct RGBA32 {
+  uint8_t r, g, b, a;
+};  
+
+// * convert SDL pixel to custom RGBA32 format
+RGBA32 decode_pixel(Uint32 pixel, SDL_PixelFormat *format) {
+  RGBA32 result;
+  result.r = (Uint8)(((pixel & format->Rmask) >> format->Rshift) << format->Rloss);
+  result.g = (Uint8)(((pixel & format->Gmask) >> format->Gshift) << format->Gloss);
+  result.b = (Uint8)(((pixel & format->Bmask) >> format->Bshift) << format->Bloss);
+  result.a = (Uint8)(((pixel & format->Amask) >> format->Ashift) << format->Aloss);
+  return result;
+}
+
+// * convert custom RGBA32 to SDL pixel format
+Uint32 encode_pixel(RGBA32 pixel, SDL_PixelFormat *format) {
+  Uint32 result = 0;
+  result |= (Uint32)((pixel.r >> format->Rloss) << format->Rshift);
+  result |= (Uint32)((pixel.g >> format->Gloss) << format->Gshift);
+  result |= (Uint32)((pixel.b >> format->Bloss) << format->Bshift);
+  result |= (Uint32)((pixel.a >> format->Aloss) << format->Ashift);
+  return result;
+}
+
 void enemy_spritesheet(SDL_Surface *surface) {
   assert(surface);
   assert(surface->format);
@@ -74,9 +98,14 @@ void enemy_spritesheet(SDL_Surface *surface) {
   
   for (int y = 0; y < surface->h; ++y) {
     for (int x = 0; x < surface->w; ++x) {
-      int pixel_idx = y * surface->pitch + x * surface->format->BytesPerPixel;
+      const int pixel_idx = y * surface->pitch + x * surface->format->BytesPerPixel;
       Uint8 *pixels = (Uint8 *)surface->pixels;
-      *(Uint32 *)(pixels + pixel_idx) |= 0x00000FFF;
+      Uint32 *pixel = (Uint32 *)(pixels + pixel_idx);
+
+      // *(Uint32 *)(pixels + pixel_idx) |= 0x00000FFF;
+      auto pixel_rgba32 = decode_pixel(*pixel, surface->format);
+      pixel_rgba32.r = (Uint8)std::min(pixel_rgba32.r + 100, 255);
+      *pixel = encode_pixel(pixel_rgba32, surface->format);
     }
   }
 
